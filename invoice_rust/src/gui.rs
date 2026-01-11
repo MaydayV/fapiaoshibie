@@ -51,7 +51,7 @@ pub struct InvoiceApp {
     log_messages: Vec<String>,
     is_processing: bool,
     status_message: String,
-    result_receiver: Option<mpsc::Receiver<Result<String, String>>>,
+    result_receiver: Option<mpsc::Receiver<Result<extractor::ProcessResult, String>>>,
     browse_dir_clicked: bool,
     browse_output_clicked: bool,
     open_result_clicked: bool,
@@ -59,6 +59,9 @@ pub struct InvoiceApp {
     stats: ProcessStats,
     show_result: bool,
     result_file_path: String,
+    result_data: Vec<extractor::InvoiceFile>,
+    show_table: bool,
+    table_scroll_offset: f32,
 }
 
 impl Default for InvoiceApp {
@@ -78,6 +81,9 @@ impl Default for InvoiceApp {
             stats: ProcessStats::default(),
             show_result: false,
             result_file_path: String::new(),
+            result_data: Vec::new(),
+            show_table: false,
+            table_scroll_offset: 0.0,
         }
     }
 }
@@ -156,17 +162,25 @@ impl InvoiceApp {
                 let elapsed = self.start_time.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
                 
                 match result {
-                    Ok(output_file) => {
-                        self.result_file_path = output_file.clone();
+                    Ok(process_result) => {
+                        self.result_file_path = process_result.output_file.clone();
+                        self.result_data = process_result.invoices.clone();
                         self.stats.elapsed_time = elapsed;
                         
-                        // 模拟统计数据
-                        self.stats.total_files = 45;
-                        self.stats.pdf_files = 42;
-                        self.stats.seller_recognized = 42;
-                        self.stats.amount_recognized = 45;
+                        // 计算真实统计数据
+                        self.stats.total_files = self.result_data.len();
+                        self.stats.pdf_files = self.result_data.iter()
+                            .filter(|inv| inv.file_type == "PDF")
+                            .count();
+                        self.stats.seller_recognized = self.result_data.iter()
+                            .filter(|inv| !inv.info.seller.is_empty() && !inv.info.seller.starts_with('*'))
+                            .count();
+                        self.stats.amount_recognized = self.result_data.iter()
+                            .filter(|inv| !inv.info.amount.is_empty())
+                            .count();
                         
                         self.show_result = true;
+                        self.show_table = true;
                         
                         self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
                         self.log("✅ 处理完成!".to_string());
@@ -175,7 +189,7 @@ impl InvoiceApp {
                             self.stats.pdf_files,
                             self.stats.accuracy_rate(),
                             elapsed));
-                        self.log(format!("💾 输出: {}", Self::format_path(&output_file)));
+                        self.log(format!("💾 输出: {}", Self::format_path(&process_result.output_file)));
                         self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
                         
                         self.status_message = "识别完成".to_string();
@@ -506,22 +520,137 @@ impl eframe::App for InvoiceApp {
                             
                             ui.add_space(16.0);
                             
-                            // 一键打开Excel按钮
+                            // 按钮组
                             ui.horizontal(|ui| {
+                                let toggle_btn = egui::Button::new(
+                                    egui::RichText::new(if self.show_table { "📋 隐藏表格" } else { "📋 查看表格" })
+                                        .size(14.0)
+                                        .color(TEXT_HIGH)
+                                )
+                                .fill(BG_INPUT)
+                                .stroke(egui::Stroke::new(1.0, BORDER))
+                                .rounding(egui::Rounding::same(6.0))
+                                .min_size(egui::vec2(120.0, 36.0));
+                                if ui.add(toggle_btn).clicked() {
+                                    self.show_table = !self.show_table;
+                                }
+                                
                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                     let open_btn = egui::Button::new(
-                                        egui::RichText::new("📊 打开 Excel 清单")
+                                        egui::RichText::new("📊 打开 Excel")
                                             .size(14.0)
                                             .color(TEXT_HIGH)
                                     )
                                     .fill(ACCENT_TECH)
                                     .rounding(egui::Rounding::same(6.0))
-                                    .min_size(egui::vec2(160.0, 36.0));
+                                    .min_size(egui::vec2(140.0, 36.0));
                                     if ui.add(open_btn).clicked() {
                                         self.open_result_clicked = true;
                                     }
                                 });
                             });
+                            
+                            ui.add_space(16.0);
+                        }
+                        
+                        // 结果表格
+                        if self.show_table && !self.result_data.is_empty() {
+                            egui::Frame::none()
+                                .fill(BG_CARD)
+                                .stroke(egui::Stroke::new(1.0, BORDER))
+                                .rounding(egui::Rounding::same(12.0))
+                                .inner_margin(egui::Margin::same(16.0))
+                                .show(ui, |ui| {
+                                    ui.label(
+                                        egui::RichText::new(format!("发票数据 (共{}条)", self.result_data.len()))
+                                            .size(15.0)
+                                            .color(TEXT_HIGH)
+                                            .strong()
+                                    );
+                                    ui.add_space(12.0);
+                                    
+                                    egui::ScrollArea::both()
+                                        .max_height(320.0)
+                                        .show(ui, |ui| {
+                                            use egui_extras::{TableBuilder, Column};
+                                            
+                                            TableBuilder::new(ui)
+                                                .striped(true)
+                                                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                                                .column(Column::exact(40.0))  // 序号
+                                                .column(Column::initial(120.0).resizable(true))  // 文件名
+                                                .column(Column::initial(140.0).resizable(true))  // 发票号码
+                                                .column(Column::initial(90.0).resizable(true))   // 日期
+                                                .column(Column::initial(120.0).resizable(true))  // 购买方
+                                                .column(Column::initial(120.0).resizable(true))  // 销售方
+                                                .column(Column::initial(80.0).resizable(true))   // 金额
+                                                .header(24.0, |mut header| {
+                                                    header.col(|ui| {
+                                                        ui.label(egui::RichText::new("序号").size(12.0).color(TEXT_MEDIUM).strong());
+                                                    });
+                                                    header.col(|ui| {
+                                                        ui.label(egui::RichText::new("文件名").size(12.0).color(TEXT_MEDIUM).strong());
+                                                    });
+                                                    header.col(|ui| {
+                                                        ui.label(egui::RichText::new("发票号码").size(12.0).color(TEXT_MEDIUM).strong());
+                                                    });
+                                                    header.col(|ui| {
+                                                        ui.label(egui::RichText::new("开票日期").size(12.0).color(TEXT_MEDIUM).strong());
+                                                    });
+                                                    header.col(|ui| {
+                                                        ui.label(egui::RichText::new("购买方").size(12.0).color(TEXT_MEDIUM).strong());
+                                                    });
+                                                    header.col(|ui| {
+                                                        ui.label(egui::RichText::new("销售方").size(12.0).color(TEXT_MEDIUM).strong());
+                                                    });
+                                                    header.col(|ui| {
+                                                        ui.label(egui::RichText::new("金额").size(12.0).color(TEXT_MEDIUM).strong());
+                                                    });
+                                                })
+                                                .body(|mut body| {
+                                                    for (idx, inv) in self.result_data.iter().enumerate() {
+                                                        body.row(22.0, |mut row| {
+                                                            row.col(|ui| {
+                                                                ui.label(egui::RichText::new((idx + 1).to_string()).size(11.0).color(TEXT_LOW));
+                                                            });
+                                                            row.col(|ui| {
+                                                                ui.label(egui::RichText::new(&inv.filename).size(11.0).color(TEXT_HIGH));
+                                                            });
+                                                            row.col(|ui| {
+                                                                ui.label(egui::RichText::new(&inv.info.invoice_number).size(11.0).color(TEXT_MEDIUM).family(egui::FontFamily::Monospace));
+                                                            });
+                                                            row.col(|ui| {
+                                                                ui.label(egui::RichText::new(&inv.info.invoice_date).size(11.0).color(TEXT_MEDIUM));
+                                                            });
+                                                            row.col(|ui| {
+                                                                let buyer = if inv.info.buyer.len() > 12 {
+                                                                    format!("{}...", &inv.info.buyer[..12])
+                                                                } else {
+                                                                    inv.info.buyer.clone()
+                                                                };
+                                                                ui.label(egui::RichText::new(buyer).size(11.0).color(TEXT_MEDIUM));
+                                                            });
+                                                            row.col(|ui| {
+                                                                let seller = if inv.info.seller.len() > 12 {
+                                                                    format!("{}...", &inv.info.seller[..12])
+                                                                } else {
+                                                                    inv.info.seller.clone()
+                                                                };
+                                                                ui.label(egui::RichText::new(seller).size(11.0).color(TEXT_MEDIUM));
+                                                            });
+                                                            row.col(|ui| {
+                                                                let amount_color = if inv.info.amount.is_empty() {
+                                                                    TEXT_LOW
+                                                                } else {
+                                                                    ACCENT_SUCCESS
+                                                                };
+                                                                ui.label(egui::RichText::new(&inv.info.amount).size(11.0).color(amount_color).family(egui::FontFamily::Monospace));
+                                                            });
+                                                        });
+                                                    }
+                                                });
+                                        });
+                                });
                             
                             ui.add_space(16.0);
                         }

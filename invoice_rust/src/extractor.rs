@@ -235,12 +235,19 @@ pub struct InvoiceFile {
     pub info: InvoiceInfo,
 }
 
+/// 处理结果
+#[derive(Clone)]
+pub struct ProcessResult {
+    pub output_file: String,
+    pub invoices: Vec<InvoiceFile>,
+}
+
 /// 处理所有发票文件并生成Excel
 pub fn process_invoices(
     base_path: &Path,
     buyer_keyword: Option<&str>,
     output_path: Option<&Path>,
-) -> Result<String, String> {
+) -> Result<ProcessResult, String> {
     let mut all_invoices = Vec::new();
 
     // 遍历目录
@@ -353,7 +360,10 @@ pub fn process_invoices(
     println!("  金额识别率: {:.1}%", amount_rate);
     println!("\nExcel已保存: {}", output_file.display());
 
-    Ok(output_file.to_string_lossy().to_string())
+    Ok(ProcessResult {
+        output_file: output_file.to_string_lossy().to_string(),
+        invoices: all_invoices,
+    })
 }
 
 /// 生成Excel文件
