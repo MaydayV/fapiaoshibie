@@ -1,0 +1,23 @@
+[package]
+name = "invoice-extractor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# PDF处理
+pdf-extract = "0.7"
+# 正则表达式
+regex = "1.10"
+# Excel生成
+rust_xlsxwriter = "0.80"
+# GUI框架
+eframe = { version = "0.26", default-features = false, features = ["default_fonts", "glow"] }
+egui = "0.26"
+# 文件对话框
+rfd = "0.14"
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+# 路径处理
+walkdir = "2.4"
+# 日志（可选）
+log = "0.4"
