@@ -235,6 +235,17 @@ pub struct InvoiceFile {
     pub info: InvoiceInfo,
 }
 
+impl Default for InvoiceFile {
+    fn default() -> Self {
+        Self {
+            folder: String::new(),
+            filename: String::new(),
+            file_type: String::new(),
+            info: InvoiceInfo::default(),
+        }
+    }
+}
+
 /// 处理结果
 #[derive(Clone)]
 pub struct ProcessResult {

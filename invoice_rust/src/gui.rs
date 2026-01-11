@@ -61,7 +61,6 @@ pub struct InvoiceApp {
     result_file_path: String,
     result_data: Vec<extractor::InvoiceFile>,
     show_table: bool,
-    table_scroll_offset: f32,
 }
 
 impl Default for InvoiceApp {
@@ -83,7 +82,6 @@ impl Default for InvoiceApp {
             result_file_path: String::new(),
             result_data: Vec::new(),
             show_table: false,
-            table_scroll_offset: 0.0,
         }
     }
 }
