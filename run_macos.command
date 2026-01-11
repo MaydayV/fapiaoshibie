@@ -18,5 +18,5 @@ fi
 source venv/bin/activate
 pip install PyMuPDF openpyxl -q 2>/dev/null
 
-# 启动图形界面
-python invoice_gui.py
+# 运行智能启动器（自动检测GUI支持）
+python run.py

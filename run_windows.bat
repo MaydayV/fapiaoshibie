@@ -19,5 +19,5 @@ REM 激活虚拟环境
 call venv\Scripts\activate.bat
 pip install PyMuPDF openpyxl -q >nul 2>&1
 
-REM 启动图形界面
-python invoice_gui.py
+REM 运行智能启动器（自动检测GUI支持）
+python run.py
