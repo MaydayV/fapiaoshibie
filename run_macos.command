@@ -1,5 +1,5 @@
 #!/bin/bash
-# 发票识别脚本 - macOS双击启动版
+# 发票识别脚本 - macOS双击启动版（使用虚拟环境）
 
 cd "$(dirname "$0")"
 
@@ -9,9 +9,17 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# 自动安装依赖
-echo "正在检查依赖..."
-pip3 install PyMuPDF openpyxl -q 2>/dev/null
+# 创建虚拟环境（如果不存在）
+if [ ! -d "venv" ]; then
+    echo "首次运行，正在创建虚拟环境..."
+    python3 -m venv venv
+fi
+
+# 激活虚拟环境并安装依赖
+echo "激活虚拟环境..."
+source venv/bin/activate
+echo "检查并安装依赖..."
+pip install PyMuPDF openpyxl -q
 
 echo ""
 echo "========================================"
@@ -20,7 +28,7 @@ echo "========================================"
 echo ""
 
 # 运行脚本
-python3 invoice_extractor.py
+python invoice_extractor.py
 
 echo ""
 echo "按任意键关闭窗口..."

@@ -1,3 +1,8 @@
+# 虚拟环境
+venv/
+env/
+.venv/
+
 # 发票文件（不上传）
 *.pdf
 *.PDF
@@ -17,8 +22,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
-env/
 
 # macOS
 .DS_Store
