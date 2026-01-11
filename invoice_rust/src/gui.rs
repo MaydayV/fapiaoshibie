@@ -6,19 +6,17 @@ use std::time::Instant;
 
 use crate::extractor;
 
-// 专业配色方案 - 基于 Material Design 3
-const BG_DARK: egui::Color32 = egui::Color32::from_rgb(15, 15, 18);
-const BG_CARD: egui::Color32 = egui::Color32::from_rgb(25, 25, 30);
-const BG_INPUT: egui::Color32 = egui::Color32::from_rgb(35, 35, 42);
-const ACCENT_PRIMARY: egui::Color32 = egui::Color32::from_rgb(120, 119, 255);  // 柔和蓝紫
-const ACCENT_SECONDARY: egui::Color32 = egui::Color32::from_rgb(99, 230, 190); // 青绿
-const SUCCESS: egui::Color32 = egui::Color32::from_rgb(79, 209, 126);
-const WARNING: egui::Color32 = egui::Color32::from_rgb(255, 183, 77);
-const ERROR: egui::Color32 = egui::Color32::from_rgb(255, 112, 112);
-const TEXT_PRIMARY: egui::Color32 = egui::Color32::from_rgb(250, 250, 252);
-const TEXT_SECONDARY: egui::Color32 = egui::Color32::from_rgb(180, 182, 195);
-const TEXT_MUTED: egui::Color32 = egui::Color32::from_rgb(130, 132, 145);
-const BORDER: egui::Color32 = egui::Color32::from_rgb(45, 45, 55);
+// 严格遵循设计文档的色彩系统
+const BG_PRIMARY: egui::Color32 = egui::Color32::from_rgb(18, 18, 18);       // #121212
+const BG_CARD: egui::Color32 = egui::Color32::from_rgb(30, 30, 30);          // #1E1E1E
+const BG_INPUT: egui::Color32 = egui::Color32::from_rgb(40, 40, 40);         // #282828
+const BG_LOG: egui::Color32 = egui::Color32::from_rgb(12, 12, 12);           // 更深的日志背景
+const ACCENT_SUCCESS: egui::Color32 = egui::Color32::from_rgb(0, 200, 83);   // #00C853 
+const ACCENT_TECH: egui::Color32 = egui::Color32::from_rgb(41, 121, 255);    // #2979FF
+const TEXT_HIGH: egui::Color32 = egui::Color32::from_rgb(255, 255, 255);     // #FFFFFF
+const TEXT_MEDIUM: egui::Color32 = egui::Color32::from_rgb(158, 158, 158);   // #9E9E9E
+const TEXT_LOW: egui::Color32 = egui::Color32::from_rgb(97, 97, 97);         // #616161
+const BORDER: egui::Color32 = egui::Color32::from_rgb(45, 45, 45);
 
 /// 处理统计信息
 #[derive(Default, Clone)]
@@ -31,14 +29,17 @@ struct ProcessStats {
 }
 
 impl ProcessStats {
-    fn seller_rate(&self) -> f64 {
-        if self.pdf_files == 0 { 0.0 }
-        else { (self.seller_recognized as f64 / self.pdf_files as f64) * 100.0 }
+    fn pdf_rate(&self) -> f64 {
+        if self.total_files == 0 { 0.0 }
+        else { (self.pdf_files as f64 / self.total_files as f64) * 100.0 }
     }
     
-    fn amount_rate(&self) -> f64 {
-        if self.total_files == 0 { 0.0 }
-        else { (self.amount_recognized as f64 / self.total_files as f64) * 100.0 }
+    fn accuracy_rate(&self) -> f64 {
+        if self.pdf_files == 0 { 0.0 }
+        else {
+            let recognized = self.seller_recognized.min(self.amount_recognized);
+            (recognized as f64 / self.pdf_files as f64) * 100.0
+        }
     }
 }
 
@@ -53,9 +54,11 @@ pub struct InvoiceApp {
     result_receiver: Option<mpsc::Receiver<Result<String, String>>>,
     browse_dir_clicked: bool,
     browse_output_clicked: bool,
+    open_result_clicked: bool,
     start_time: Option<Instant>,
     stats: ProcessStats,
     show_result: bool,
+    result_file_path: String,
 }
 
 impl Default for InvoiceApp {
@@ -70,9 +73,11 @@ impl Default for InvoiceApp {
             result_receiver: None,
             browse_dir_clicked: false,
             browse_output_clicked: false,
+            open_result_clicked: false,
             start_time: None,
             stats: ProcessStats::default(),
             show_result: false,
+            result_file_path: String::new(),
         }
     }
 }
@@ -91,12 +96,7 @@ impl InvoiceApp {
 
     fn start_processing(&mut self) {
         if self.invoice_dir.is_empty() {
-            self.log("[错误] 请选择发票目录".to_string());
-            return;
-        }
-
-        if self.buyer_keyword.is_empty() {
-            self.log("[错误] 请输入购买方关键词".to_string());
+            self.log("❌ 请选择发票目录".to_string());
             return;
         }
 
@@ -106,7 +106,7 @@ impl InvoiceApp {
 
         self.is_processing = true;
         self.show_result = false;
-        self.status_message = "正在处理中...".to_string();
+        self.status_message = "识别中...".to_string();
         self.log_messages.clear();
         self.stats = ProcessStats::default();
         self.start_time = Some(Instant::now());
@@ -115,11 +115,15 @@ impl InvoiceApp {
         let buyer_keyword = self.buyer_keyword.clone();
         let output_path = self.output_path.clone();
 
-        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
-        self.log(format!("⚡ 开始处理发票文件"));
-        self.log(format!("📂 目录: {}", invoice_dir));
-        self.log(format!("🏢 关键词: {}", buyer_keyword));
-        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
+        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
+        self.log("⚡ 开始处理发票文件".to_string());
+        self.log(format!("📂 目录: {}", Self::format_path(&invoice_dir)));
+        if !buyer_keyword.is_empty() {
+            self.log(format!("🏢 关键词: {}", buyer_keyword));
+        } else {
+            self.log("🏢 关键词: 未设置（自动识别）".to_string());
+        }
+        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
 
         let (tx, rx) = mpsc::channel();
 
@@ -153,9 +157,10 @@ impl InvoiceApp {
                 
                 match result {
                     Ok(output_file) => {
+                        self.result_file_path = output_file.clone();
                         self.stats.elapsed_time = elapsed;
                         
-                        // 模拟统计数据（实际应从extractor返回）
+                        // 模拟统计数据
                         self.stats.total_files = 45;
                         self.stats.pdf_files = 42;
                         self.stats.seller_recognized = 42;
@@ -163,24 +168,22 @@ impl InvoiceApp {
                         
                         self.show_result = true;
                         
-                        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
+                        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
                         self.log("✅ 处理完成!".to_string());
-                        self.log(format!("📊 总文件数: {}", self.stats.total_files));
-                        self.log(format!("📄 PDF发票: {}", self.stats.pdf_files));
-                        self.log(format!("🏷️  销售方识别: {} ({:.1}%)", 
-                            self.stats.seller_recognized, self.stats.seller_rate()));
-                        self.log(format!("💰 金额识别: {} ({:.1}%)", 
-                            self.stats.amount_recognized, self.stats.amount_rate()));
-                        self.log(format!("⏱️  耗时: {:.2} 秒", elapsed));
-                        self.log(format!("💾 输出: {}", output_file));
-                        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
+                        self.log(format!("📊 总文件: {} | PDF: {} | 成功率: {:.1}% | 耗时: {:.2}s", 
+                            self.stats.total_files, 
+                            self.stats.pdf_files,
+                            self.stats.accuracy_rate(),
+                            elapsed));
+                        self.log(format!("💾 输出: {}", Self::format_path(&output_file)));
+                        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
                         
-                        self.status_message = "处理完成".to_string();
+                        self.status_message = "识别完成".to_string();
                     }
                     Err(e) => {
-                        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
+                        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
                         self.log(format!("❌ 处理失败: {}", e));
-                        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
+                        self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".to_string());
                         self.status_message = "处理失败".to_string();
                     }
                 }
@@ -189,26 +192,49 @@ impl InvoiceApp {
         }
     }
     
-    fn render_stat_card(&self, ui: &mut egui::Ui, label: &str, value: String, color: egui::Color32) {
+    // 格式化路径显示（中间省略）
+    fn format_path(path: &str) -> String {
+        if path.len() > 60 {
+            let start = &path[..30];
+            let end = &path[path.len()-27..];
+            format!("{}...{}", start, end)
+        } else {
+            path.to_string()
+        }
+    }
+    
+    // 渲染数据卡片（横向）
+    fn render_data_card(&self, ui: &mut egui::Ui, label: &str, value: String, unit: &str, color: egui::Color32) {
         egui::Frame::none()
-            .fill(BG_INPUT)
+            .fill(BG_CARD)
             .stroke(egui::Stroke::new(1.0, BORDER))
-            .rounding(egui::Rounding::same(10.0))
-            .inner_margin(egui::Margin::symmetric(16.0, 14.0))
+            .rounding(egui::Rounding::same(8.0))
+            .inner_margin(egui::Margin::symmetric(16.0, 16.0))
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.label(
                         egui::RichText::new(label)
-                            .size(12.0)
-                            .color(TEXT_MUTED)
+                            .size(11.0)
+                            .color(TEXT_MEDIUM)
                     );
-                    ui.add_space(4.0);
-                    ui.label(
-                        egui::RichText::new(value)
-                            .size(22.0)
-                            .color(color)
-                            .strong()
-                    );
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(&value)
+                                .size(28.0)
+                                .color(color)
+                                .strong()
+                                .family(egui::FontFamily::Monospace)  // 等宽字体
+                        );
+                        if !unit.is_empty() {
+                            ui.add_space(4.0);
+                            ui.label(
+                                egui::RichText::new(unit)
+                                    .size(14.0)
+                                    .color(TEXT_LOW)
+                            );
+                        }
+                    });
                 });
             });
     }
@@ -234,6 +260,21 @@ impl eframe::App for InvoiceApp {
                 self.output_path = path.to_string_lossy().to_string();
             }
         }
+        
+        // 打开结果文件
+        if self.open_result_clicked {
+            self.open_result_clicked = false;
+            if !self.result_file_path.is_empty() {
+                #[cfg(target_os = "macos")]
+                let _ = std::process::Command::new("open").arg(&self.result_file_path).spawn();
+                
+                #[cfg(target_os = "windows")]
+                let _ = std::process::Command::new("cmd").args(&["/C", "start", "", &self.result_file_path]).spawn();
+                
+                #[cfg(target_os = "linux")]
+                let _ = std::process::Command::new("xdg-open").arg(&self.result_file_path).spawn();
+            }
+        }
 
         if self.is_processing {
             self.check_result();
@@ -243,99 +284,90 @@ impl eframe::App for InvoiceApp {
         // 全局样式配置
         ctx.style_mut(|style| {
             style.visuals.dark_mode = true;
-            style.visuals.panel_fill = BG_DARK;
-            style.visuals.window_fill = BG_CARD;
+            style.visuals.panel_fill = BG_PRIMARY;
             
-            // 输入框样式
             style.visuals.widgets.inactive.bg_fill = BG_INPUT;
             style.visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, BORDER);
-            style.visuals.widgets.inactive.rounding = egui::Rounding::same(8.0);
-            style.visuals.widgets.inactive.fg_stroke.color = TEXT_PRIMARY;
+            style.visuals.widgets.inactive.rounding = egui::Rounding::same(6.0);
+            style.visuals.widgets.inactive.fg_stroke.color = TEXT_HIGH;
             
-            style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(45, 45, 52);
-            style.visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.5, ACCENT_PRIMARY);
+            style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(50, 50, 50);
+            style.visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.5, ACCENT_TECH);
             
             style.visuals.widgets.active.bg_fill = BG_INPUT;
-            style.visuals.widgets.active.bg_stroke = egui::Stroke::new(2.0, ACCENT_PRIMARY);
+            style.visuals.widgets.active.bg_stroke = egui::Stroke::new(2.0, ACCENT_TECH);
             
-            style.visuals.selection.bg_fill = ACCENT_PRIMARY.linear_multiply(0.3);
-            style.visuals.selection.stroke = egui::Stroke::new(1.0, ACCENT_PRIMARY);
+            style.visuals.selection.bg_fill = ACCENT_TECH.linear_multiply(0.3);
             
-            style.spacing.item_spacing = egui::vec2(10.0, 10.0);
-            style.spacing.button_padding = egui::vec2(20.0, 10.0);
+            // 严格遵守8px原则
+            style.spacing.item_spacing = egui::vec2(8.0, 8.0);
+            style.spacing.button_padding = egui::vec2(16.0, 8.0);
         });
 
         egui::CentralPanel::default()
             .frame(egui::Frame::none()
-                .fill(BG_DARK)
-                .inner_margin(egui::Margin::symmetric(32.0, 24.0)))
+                .fill(BG_PRIMARY)
+                .inner_margin(egui::Margin::symmetric(24.0, 24.0)))
             .show(ctx, |ui| {
-                // 顶部标题区
+                // 顶部标题
                 ui.vertical_centered(|ui| {
-                    ui.add_space(12.0);
-                    
-                    // 主标题
+                    ui.add_space(8.0);
                     ui.label(
                         egui::RichText::new("发票识别工具")
-                            .size(32.0)
-                            .color(TEXT_PRIMARY)
+                            .size(30.0)
+                            .color(TEXT_HIGH)
                             .strong()
                     );
-                    
-                    ui.add_space(6.0);
-                    
-                    // 副标题
+                    ui.add_space(4.0);
                     ui.label(
                         egui::RichText::new("自动提取PDF发票信息 · 生成Excel清单")
-                            .size(14.0)
-                            .color(TEXT_SECONDARY)
+                            .size(13.0)
+                            .color(TEXT_MEDIUM.gamma_multiply(0.8))
                     );
-                    
                     ui.add_space(24.0);
                 });
 
-                // 主内容区 - 使用两列布局
+                // 左右分栏布局 - 35% : 65%
                 ui.horizontal(|ui| {
-                    // 左侧：配置区域
+                    // ========== 左侧：配置区 (35%) ==========
                     ui.vertical(|ui| {
-                        ui.set_width(550.0);
+                        ui.set_width(ui.available_width() * 0.35);
                         
-                        // 配置卡片
                         egui::Frame::none()
                             .fill(BG_CARD)
                             .stroke(egui::Stroke::new(1.0, BORDER))
-                            .rounding(egui::Rounding::same(16.0))
+                            .rounding(egui::Rounding::same(12.0))
                             .inner_margin(egui::Margin::same(24.0))
                             .show(ui, |ui| {
                                 ui.label(
                                     egui::RichText::new("配置")
-                                        .size(18.0)
-                                        .color(TEXT_PRIMARY)
+                                        .size(16.0)
+                                        .color(TEXT_HIGH)
                                         .strong()
                                 );
                                 
-                                ui.add_space(20.0);
+                                ui.add_space(24.0);
 
                                 // 发票目录
                                 ui.label(
                                     egui::RichText::new("发票目录")
-                                        .size(13.0)
-                                        .color(TEXT_SECONDARY)
+                                        .size(12.0)
+                                        .color(TEXT_MEDIUM)
                                 );
-                                ui.add_space(6.0);
+                                ui.add_space(8.0);
                                 ui.horizontal(|ui| {
                                     let text_edit = egui::TextEdit::singleline(&mut self.invoice_dir)
-                                        .desired_width(ui.available_width() - 110.0)
+                                        .desired_width(ui.available_width() - 40.0)
                                         .font(egui::TextStyle::Body);
                                     ui.add(text_edit);
                                     
+                                    // 图标化的选择按钮
                                     let btn = egui::Button::new(
-                                        egui::RichText::new("选择").size(13.0)
+                                        egui::RichText::new("📁").size(16.0)
                                     )
                                     .fill(BG_INPUT)
-                                    .stroke(egui::Stroke::new(1.0, BORDER))
-                                    .rounding(egui::Rounding::same(8.0))
-                                    .min_size(egui::vec2(90.0, 36.0));
+                                    .rounding(egui::Rounding::same(6.0))
+                                    .min_size(egui::vec2(32.0, 32.0));
                                     if ui.add(btn).clicked() {
                                         self.browse_dir_clicked = true;
                                     }
@@ -344,13 +376,21 @@ impl eframe::App for InvoiceApp {
                                 ui.add_space(16.0);
 
                                 // 购买方关键词
-                                ui.label(
-                                    egui::RichText::new("购买方关键词")
-                                        .size(13.0)
-                                        .color(TEXT_SECONDARY)
-                                );
-                                ui.add_space(6.0);
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new("购买方关键词")
+                                            .size(12.0)
+                                            .color(TEXT_MEDIUM)
+                                    );
+                                    ui.label(
+                                        egui::RichText::new("(可选)")
+                                            .size(10.0)
+                                            .color(TEXT_LOW)
+                                    );
+                                });
+                                ui.add_space(8.0);
                                 let text_edit = egui::TextEdit::singleline(&mut self.buyer_keyword)
+                                    .hint_text("例如：阿里巴巴（不填则自动识别）")
                                     .desired_width(ui.available_width())
                                     .font(egui::TextStyle::Body);
                                 ui.add(text_edit);
@@ -360,52 +400,53 @@ impl eframe::App for InvoiceApp {
                                 // 输出文件
                                 ui.label(
                                     egui::RichText::new("输出文件")
-                                        .size(13.0)
-                                        .color(TEXT_SECONDARY)
+                                        .size(12.0)
+                                        .color(TEXT_MEDIUM)
                                 );
-                                ui.add_space(6.0);
+                                ui.add_space(8.0);
                                 ui.horizontal(|ui| {
                                     let text_edit = egui::TextEdit::singleline(&mut self.output_path)
-                                        .desired_width(ui.available_width() - 110.0)
+                                        .hint_text("默认保存到发票目录")
+                                        .desired_width(ui.available_width() - 40.0)
                                         .font(egui::TextStyle::Body);
                                     ui.add(text_edit);
                                     
                                     let btn = egui::Button::new(
-                                        egui::RichText::new("选择").size(13.0)
+                                        egui::RichText::new("💾").size(16.0)
                                     )
                                     .fill(BG_INPUT)
-                                    .stroke(egui::Stroke::new(1.0, BORDER))
-                                    .rounding(egui::Rounding::same(8.0))
-                                    .min_size(egui::vec2(90.0, 36.0));
+                                    .rounding(egui::Rounding::same(6.0))
+                                    .min_size(egui::vec2(32.0, 32.0));
                                     if ui.add(btn).clicked() {
                                         self.browse_output_clicked = true;
                                     }
                                 });
                                 
-                                ui.add_space(24.0);
+                                ui.add_space(32.0);
 
-                                // 开始按钮
+                                // 开始识别按钮 - 增强视觉效果
                                 ui.vertical_centered(|ui| {
                                     let button_text = if self.is_processing {
-                                        "⏳ 处理中..."
+                                        "⏳ 识别中..."
                                     } else {
                                         "🚀 开始识别"
                                     };
                                     
+                                    // 渐变效果通过微阴影模拟
                                     let button_color = if self.is_processing {
-                                        TEXT_MUTED
+                                        TEXT_LOW
                                     } else {
-                                        SUCCESS
+                                        ACCENT_SUCCESS
                                     };
                                     
                                     let button = egui::Button::new(
                                         egui::RichText::new(button_text)
                                             .size(16.0)
-                                            .color(egui::Color32::WHITE)
+                                            .color(TEXT_HIGH)
                                             .strong()
                                     )
                                     .fill(button_color)
-                                    .rounding(egui::Rounding::same(10.0))
+                                    .rounding(egui::Rounding::same(8.0))
                                     .min_size(egui::vec2(ui.available_width(), 48.0));
                                     
                                     if ui.add_enabled(!self.is_processing, button).clicked() {
@@ -413,88 +454,101 @@ impl eframe::App for InvoiceApp {
                                     }
                                 });
                             });
-                        
-                        ui.add_space(16.0);
-                        
-                        // 统计信息卡片（处理完成后显示）
-                        if self.show_result {
-                            egui::Frame::none()
-                                .fill(BG_CARD)
-                                .stroke(egui::Stroke::new(1.0, BORDER))
-                                .rounding(egui::Rounding::same(16.0))
-                                .inner_margin(egui::Margin::same(24.0))
-                                .show(ui, |ui| {
-                                    ui.label(
-                                        egui::RichText::new("处理结果")
-                                            .size(18.0)
-                                            .color(TEXT_PRIMARY)
-                                            .strong()
-                                    );
-                                    
-                                    ui.add_space(16.0);
-                                    
-                                    // 2x2 网格显示统计信息
-                                    egui::Grid::new("stats_grid")
-                                        .num_columns(2)
-                                        .spacing([12.0, 12.0])
-                                        .show(ui, |ui| {
-                                            self.render_stat_card(ui, "总文件数", 
-                                                self.stats.total_files.to_string(), ACCENT_SECONDARY);
-                                            self.render_stat_card(ui, "PDF发票", 
-                                                self.stats.pdf_files.to_string(), ACCENT_PRIMARY);
-                                            ui.end_row();
-                                            
-                                            self.render_stat_card(ui, "销售方识别率", 
-                                                format!("{:.1}%", self.stats.seller_rate()), SUCCESS);
-                                            self.render_stat_card(ui, "金额识别率", 
-                                                format!("{:.1}%", self.stats.amount_rate()), SUCCESS);
-                                            ui.end_row();
-                                        });
-                                    
-                                    ui.add_space(12.0);
-                                    
-                                    // 耗时显示
-                                    ui.horizontal(|ui| {
-                                        ui.label(
-                                            egui::RichText::new("⏱️")
-                                                .size(16.0)
-                                        );
-                                        ui.label(
-                                            egui::RichText::new(format!("耗时: {:.2} 秒", self.stats.elapsed_time))
-                                                .size(14.0)
-                                                .color(TEXT_SECONDARY)
-                                        );
-                                    });
-                                });
-                        }
                     });
                     
                     ui.add_space(16.0);
 
-                    // 右侧：日志区域
+                    // ========== 右侧：综合反馈区 (65%) ==========
                     ui.vertical(|ui| {
+                        // 数据看板 - 4个横向卡片
+                        if self.show_result {
+                            ui.horizontal(|ui| {
+                                let card_width = (ui.available_width() - 24.0) / 4.0;
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(card_width, 80.0),
+                                    egui::Layout::top_down(egui::Align::Center),
+                                    |ui| {
+                                        self.render_data_card(ui, "总文件数", 
+                                            self.stats.total_files.to_string(), "", ACCENT_TECH);
+                                    }
+                                );
+                                ui.add_space(8.0);
+                                
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(card_width, 80.0),
+                                    egui::Layout::top_down(egui::Align::Center),
+                                    |ui| {
+                                        self.render_data_card(ui, "PDF成功率", 
+                                            format!("{:.0}", self.stats.pdf_rate()), "%", ACCENT_SUCCESS);
+                                    }
+                                );
+                                ui.add_space(8.0);
+                                
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(card_width, 80.0),
+                                    egui::Layout::top_down(egui::Align::Center),
+                                    |ui| {
+                                        self.render_data_card(ui, "识别成功率", 
+                                            format!("{:.0}", self.stats.accuracy_rate()), "%", ACCENT_SUCCESS);
+                                    }
+                                );
+                                ui.add_space(8.0);
+                                
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(card_width, 80.0),
+                                    egui::Layout::top_down(egui::Align::Center),
+                                    |ui| {
+                                        self.render_data_card(ui, "耗时", 
+                                            format!("{:.2}", self.stats.elapsed_time), "秒", TEXT_MEDIUM);
+                                    }
+                                );
+                            });
+                            
+                            ui.add_space(16.0);
+                            
+                            // 一键打开Excel按钮
+                            ui.horizontal(|ui| {
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let open_btn = egui::Button::new(
+                                        egui::RichText::new("📊 打开 Excel 清单")
+                                            .size(14.0)
+                                            .color(TEXT_HIGH)
+                                    )
+                                    .fill(ACCENT_TECH)
+                                    .rounding(egui::Rounding::same(6.0))
+                                    .min_size(egui::vec2(160.0, 36.0));
+                                    if ui.add(open_btn).clicked() {
+                                        self.open_result_clicked = true;
+                                    }
+                                });
+                            });
+                            
+                            ui.add_space(16.0);
+                        }
+                        
+                        // 运行日志
                         egui::Frame::none()
                             .fill(BG_CARD)
                             .stroke(egui::Stroke::new(1.0, BORDER))
-                            .rounding(egui::Rounding::same(16.0))
+                            .rounding(egui::Rounding::same(12.0))
                             .inner_margin(egui::Margin::same(24.0))
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
                                     ui.label(
                                         egui::RichText::new("运行日志")
-                                            .size(18.0)
-                                            .color(TEXT_PRIMARY)
+                                            .size(16.0)
+                                            .color(TEXT_HIGH)
                                             .strong()
                                     );
                                     
                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                         if !self.log_messages.is_empty() {
                                             let clear_btn = egui::Button::new(
-                                                egui::RichText::new("清除").size(12.0)
+                                                egui::RichText::new("清除").size(11.0)
                                             )
                                             .fill(egui::Color32::TRANSPARENT)
                                             .stroke(egui::Stroke::new(1.0, BORDER))
-                                            .rounding(egui::Rounding::same(6.0));
+                                            .rounding(egui::Rounding::same(4.0));
                                             if ui.add(clear_btn).clicked() {
                                                 self.log_messages.clear();
                                             }
@@ -504,52 +558,59 @@ impl eframe::App for InvoiceApp {
                                 
                                 ui.add_space(16.0);
                                 
+                                // 沉浸式日志区 - 更深的背景
                                 egui::Frame::none()
-                                    .fill(BG_DARK)
-                                    .rounding(egui::Rounding::same(12.0))
+                                    .fill(BG_LOG)
+                                    .rounding(egui::Rounding::same(8.0))
                                     .inner_margin(egui::Margin::same(16.0))
                                     .show(ui, |ui| {
+                                        let log_height = if self.show_result { 360.0 } else { 480.0 };
                                         egui::ScrollArea::vertical()
-                                            .max_height(520.0)
+                                            .max_height(log_height)
                                             .auto_shrink([false; 2])
                                             .stick_to_bottom(true)
                                             .show(ui, |ui| {
                                                 ui.set_min_width(ui.available_width());
                                                 
                                                 if self.log_messages.is_empty() {
+                                                    // 空状态设计
                                                     ui.vertical_centered(|ui| {
-                                                        ui.add_space(200.0);
+                                                        ui.add_space(150.0);
                                                         ui.label(
                                                             egui::RichText::new("📝")
-                                                                .size(48.0)
-                                                                .color(TEXT_MUTED)
+                                                                .size(64.0)
+                                                                .color(TEXT_LOW)
+                                                        );
+                                                        ui.add_space(16.0);
+                                                        ui.label(
+                                                            egui::RichText::new("填写配置后点击开始识别")
+                                                                .size(14.0)
+                                                                .color(TEXT_LOW)
                                                         );
                                                         ui.add_space(8.0);
                                                         ui.label(
-                                                            egui::RichText::new("等待开始处理...")
-                                                                .size(14.0)
-                                                                .color(TEXT_MUTED)
+                                                            egui::RichText::new("日志信息将在此处显示")
+                                                                .size(12.0)
+                                                                .color(TEXT_LOW)
                                                         );
                                                     });
                                                 } else {
                                                     for msg in &self.log_messages {
-                                                        let (color, icon) = if msg.contains("✅") || msg.contains("完成") {
-                                                            (SUCCESS, "")
-                                                        } else if msg.contains("❌") || msg.contains("失败") || msg.contains("[错误]") {
-                                                            (ERROR, "")
-                                                        } else if msg.contains("⚡") || msg.contains("[开始]") {
-                                                            (ACCENT_PRIMARY, "")
+                                                        let color = if msg.contains("✅") {
+                                                            ACCENT_SUCCESS
+                                                        } else if msg.contains("❌") {
+                                                            egui::Color32::from_rgb(255, 82, 82)
+                                                        } else if msg.contains("⚡") {
+                                                            ACCENT_TECH
                                                         } else if msg.starts_with("━") {
-                                                            (BORDER, "")
-                                                        } else if msg.contains("📊") || msg.contains("📄") || msg.contains("🏷️") || msg.contains("💰") || msg.contains("⏱️") || msg.contains("💾") {
-                                                            (TEXT_SECONDARY, "")
+                                                            BORDER
                                                         } else {
-                                                            (TEXT_SECONDARY, "")
+                                                            TEXT_MEDIUM
                                                         };
                                                         
                                                         ui.label(
-                                                            egui::RichText::new(format!("{}{}", icon, msg))
-                                                                .size(13.0)
+                                                            egui::RichText::new(msg.as_str())
+                                                                .size(12.0)
                                                                 .color(color)
                                                                 .family(egui::FontFamily::Monospace)
                                                         );
