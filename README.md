@@ -10,25 +10,23 @@
 - 从图片文件名中提取金额（订单截图等）
 - 生成格式化的Excel清单
 
-## 依赖安装
+## 快速开始（双击运行）
+
+### macOS
+双击 `run_macos.command` 文件即可运行
+
+### Windows
+双击 `run_windows.bat` 文件即可运行
+
+首次运行会自动安装所需依赖。
+
+## 高级用法（命令行）
 
 ```bash
-pip3 install PyMuPDF openpyxl
-```
-
-## 使用方法
-
-### 交互式运行
-```bash
+# 方式1：交互式运行
 python3 invoice_extractor.py
-```
 
-按提示输入：
-1. 发票文件所在目录路径
-2. 购买方公司名称关键词
-
-### 命令行参数
-```bash
+# 方式2：命令行参数
 python3 invoice_extractor.py <发票目录> <购买方关键词> [输出文件]
 ```
 
@@ -36,6 +34,11 @@ python3 invoice_extractor.py <发票目录> <购买方关键词> [输出文件]
 ```bash
 python3 invoice_extractor.py ./invoices "公司关键词" ./result.xlsx
 ```
+
+## 系统要求
+
+- Python 3.7+
+- macOS / Windows / Linux
 
 ## 识别率
 
