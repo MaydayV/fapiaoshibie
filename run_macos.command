@@ -28,26 +28,21 @@ fi
 source venv/bin/activate
 pip install PyMuPDF openpyxl -q 2>/dev/null
 
-# 用户选择运行模式
+# 用户选择：图形化交互 vs 终端交互
 MODE=$(osascript << 'APPLESCRIPT' 2>/dev/null
 tell application "System Events"
-    set dialogResult to display dialog "请选择运行模式：" & return & return & "• 原生对话框 - macOS 原生交互（推荐）" & return & "• tkinter 图形界面 - 可视化窗口" & return & "• 命令行模式 - 终端交互" buttons {"原生对话框", "图形界面", "命令行模式", "退出"} default button 1
+    set dialogResult to display dialog "请选择交互方式：" & return & return & "• 图形化交互 - 使用对话框选择和输入" & return & "• 终端交互 - 在终端中输入命令" buttons {"图形化交互", "终端交互", "退出"} default button 1
     return button returned of dialogResult
 end tell
 APPLESCRIPT
 )
 
-case "$MODE" in
-    "原生对话框")
-        exec $PYTHON_FOUND invoice_macos_dialog.py
-        ;;
-    "图形界面")
-        exec $PYTHON_FOUND invoice_gui.py
-        ;;
-    "命令行模式")
-        exec $PYTHON_FOUND invoice_extractor.py
-        ;;
-    *)
-        exit 0
-        ;;
-esac
+if [[ "$MODE" == "退出" ]] || [[ -z "$MODE" ]]; then
+    exit 0
+fi
+
+if [[ "$MODE" == "图形化交互" ]]; then
+    exec $PYTHON_FOUND invoice_macos_dialog.py
+else
+    exec $PYTHON_FOUND invoice_extractor.py
+fi

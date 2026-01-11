@@ -7,47 +7,32 @@
 
 ## 功能特点
 
-- 🖥️ **智能启动** - 自动检测图形界面支持，无GUI则使用命令行
+- 🖥️ **两种交互方式** - 图形化对话框 / 终端命令行
 - 📊 **自动提取信息** - 发票号码、日期、购买方、销售方、金额等
 - 🎯 **高识别率** - PDF发票识别率接近100%
 - 🔒 **虚拟环境隔离** - 不影响系统Python环境
-- 🔧 **友好引导** - 未安装Python时提供安装指引
+- 🍎 **macOS 原生对话框** - 使用系统原生 API，稳定可靠
 
 ## 快速开始
-
-### 前置要求
-
-- Python 3.7 或更高版本
-
-> 💡 **没有安装 Python？**  
-> 双击启动脚本时会自动检测并提供安装引导，或访问 [安装教程](INSTALL.md)
 
 ### 运行工具
 
 #### macOS
-双击 `run_macos.command` 文件
+双击 `run_macos.command` 文件，选择交互方式：
+- **图形化交互** - 使用 macOS 原生对话框（推荐）
+- **终端交互** - 在终端中输入
 
-#### Windows  
+#### Windows
 双击 `run_windows.bat` 文件
-
-### 运行模式
-
-程序会自动：
-1. 检测 Python 是否安装
-2. 创建虚拟环境
-3. 安装所需依赖
-4. 检测图形界面支持
-5. 启动对应模式
 
 ## 文件说明
 
 | 文件 | 说明 |
 |------|------|
-| `run_macos.command` | macOS双击启动 |
-| `run_windows.bat` | Windows双击启动 |
-| `run.py` | 智能启动器 |
-| `invoice_gui.py` | 图形界面程序 |
-| `invoice_extractor.py` | 命令行程序 |
+| `run_macos.command` | macOS 双击启动 |
+| `run_windows.bat` | Windows 双击启动 |
+| `invoice_macos_dialog.py` | macOS 原生对话框模式 |
+| `invoice_extractor.py` | 终端交互模式 |
 | `INSTALL.md` | 详细安装教程 |
 | `venv/` | 虚拟环境（自动创建）|
 
@@ -57,17 +42,6 @@
 
 - 📘 [详细安装教程](INSTALL.md)
 - 🔗 [Python 官网下载](https://www.python.org/downloads/)
-
-## 常见问题
-
-### Q: 提示"未检测到 Python"
-**A**: 请先安装 Python 3.7+，双击启动脚本会提供安装引导。
-
-### Q: 图形界面无法启动
-**A**: 你的 Python 不支持 tkinter。程序会自动切换到命令行模式。
-
-### Q: macOS 图形界面问题
-**A**: 使用系统自带 Python 或通过官方安装包安装的版本通常支持GUI。
 
 ## 识别率
 
