@@ -6,19 +6,18 @@ use std::time::Instant;
 
 use crate::extractor;
 
-// 严格遵循设计文档的色彩系统
-const BG_PRIMARY: egui::Color32 = egui::Color32::from_rgb(18, 18, 18);       // #121212
-const BG_CARD: egui::Color32 = egui::Color32::from_rgb(30, 30, 30);          // #1E1E1E
-const BG_INPUT: egui::Color32 = egui::Color32::from_rgb(40, 40, 40);         // #282828
-const BG_LOG: egui::Color32 = egui::Color32::from_rgb(12, 12, 12);           // 更深的日志背景
-const ACCENT_SUCCESS: egui::Color32 = egui::Color32::from_rgb(0, 200, 83);   // #00C853 
-const ACCENT_TECH: egui::Color32 = egui::Color32::from_rgb(41, 121, 255);    // #2979FF
-const TEXT_HIGH: egui::Color32 = egui::Color32::from_rgb(255, 255, 255);     // #FFFFFF
-const TEXT_MEDIUM: egui::Color32 = egui::Color32::from_rgb(158, 158, 158);   // #9E9E9E
-const TEXT_LOW: egui::Color32 = egui::Color32::from_rgb(97, 97, 97);         // #616161
+// 专业配色系统
+const BG_PRIMARY: egui::Color32 = egui::Color32::from_rgb(18, 18, 18);
+const BG_CARD: egui::Color32 = egui::Color32::from_rgb(30, 30, 30);
+const BG_INPUT: egui::Color32 = egui::Color32::from_rgb(40, 40, 40);
+const BG_LOG: egui::Color32 = egui::Color32::from_rgb(12, 12, 12);
+const ACCENT_SUCCESS: egui::Color32 = egui::Color32::from_rgb(0, 200, 83);
+const ACCENT_TECH: egui::Color32 = egui::Color32::from_rgb(41, 121, 255);
+const TEXT_HIGH: egui::Color32 = egui::Color32::from_rgb(255, 255, 255);
+const TEXT_MEDIUM: egui::Color32 = egui::Color32::from_rgb(158, 158, 158);
+const TEXT_LOW: egui::Color32 = egui::Color32::from_rgb(97, 97, 97);
 const BORDER: egui::Color32 = egui::Color32::from_rgb(45, 45, 45);
 
-/// 处理统计信息
 #[derive(Default, Clone)]
 struct ProcessStats {
     total_files: usize,
@@ -43,7 +42,6 @@ impl ProcessStats {
     }
 }
 
-/// GUI应用状态
 pub struct InvoiceApp {
     invoice_dir: String,
     buyer_keyword: String,
@@ -81,7 +79,7 @@ impl Default for InvoiceApp {
             show_result: false,
             result_file_path: String::new(),
             result_data: Vec::new(),
-            show_table: false,
+            show_table: true,
         }
     }
 }
@@ -165,7 +163,6 @@ impl InvoiceApp {
                         self.result_data = process_result.invoices.clone();
                         self.stats.elapsed_time = elapsed;
                         
-                        // 计算真实统计数据
                         self.stats.total_files = self.result_data.len();
                         self.stats.pdf_files = self.result_data.iter()
                             .filter(|inv| inv.file_type == "PDF")
@@ -204,7 +201,6 @@ impl InvoiceApp {
         }
     }
     
-    // 格式化路径显示（中间省略）
     fn format_path(path: &str) -> String {
         if path.len() > 60 {
             let start = &path[..30];
@@ -215,13 +211,12 @@ impl InvoiceApp {
         }
     }
     
-    // 渲染数据卡片（横向）
     fn render_data_card(&self, ui: &mut egui::Ui, label: &str, value: String, unit: &str, color: egui::Color32) {
         egui::Frame::none()
             .fill(BG_CARD)
             .stroke(egui::Stroke::new(1.0, BORDER))
             .rounding(egui::Rounding::same(8.0))
-            .inner_margin(egui::Margin::symmetric(16.0, 16.0))
+            .inner_margin(egui::Margin::symmetric(16.0, 14.0))
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.label(
@@ -229,20 +224,20 @@ impl InvoiceApp {
                             .size(11.0)
                             .color(TEXT_MEDIUM)
                     );
-                    ui.add_space(8.0);
+                    ui.add_space(6.0);
                     ui.horizontal(|ui| {
                         ui.label(
                             egui::RichText::new(&value)
-                                .size(28.0)
+                                .size(26.0)
                                 .color(color)
                                 .strong()
-                                .family(egui::FontFamily::Monospace)  // 等宽字体
+                                .family(egui::FontFamily::Monospace)
                         );
                         if !unit.is_empty() {
                             ui.add_space(4.0);
                             ui.label(
                                 egui::RichText::new(unit)
-                                    .size(14.0)
+                                    .size(13.0)
                                     .color(TEXT_LOW)
                             );
                         }
@@ -254,7 +249,6 @@ impl InvoiceApp {
 
 impl eframe::App for InvoiceApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // 处理文件选择
         if self.browse_dir_clicked {
             self.browse_dir_clicked = false;
             if let Some(path) = rfd::FileDialog::new().pick_folder() {
@@ -273,7 +267,6 @@ impl eframe::App for InvoiceApp {
             }
         }
         
-        // 打开结果文件
         if self.open_result_clicked {
             self.open_result_clicked = false;
             if !self.result_file_path.is_empty() {
@@ -293,7 +286,6 @@ impl eframe::App for InvoiceApp {
             ctx.request_repaint();
         }
 
-        // 全局样式配置
         ctx.style_mut(|style| {
             style.visuals.dark_mode = true;
             style.visuals.panel_fill = BG_PRIMARY;
@@ -311,303 +303,323 @@ impl eframe::App for InvoiceApp {
             
             style.visuals.selection.bg_fill = ACCENT_TECH.linear_multiply(0.3);
             
-            // 严格遵守8px原则
             style.spacing.item_spacing = egui::vec2(8.0, 8.0);
             style.spacing.button_padding = egui::vec2(16.0, 8.0);
+            style.spacing.scroll.bar_width = 8.0;  // 滚动条宽度
+            style.spacing.scroll.bar_inner_margin = 2.0;
+            style.spacing.scroll.bar_outer_margin = 2.0;
         });
 
         egui::CentralPanel::default()
             .frame(egui::Frame::none()
                 .fill(BG_PRIMARY)
-                .inner_margin(egui::Margin::symmetric(24.0, 24.0)))
+                .inner_margin(egui::Margin::symmetric(24.0, 20.0)))
             .show(ctx, |ui| {
-                // 顶部标题
-                ui.vertical_centered(|ui| {
-                    ui.add_space(8.0);
-                    ui.label(
-                        egui::RichText::new("发票识别工具")
-                            .size(30.0)
-                            .color(TEXT_HIGH)
-                            .strong()
-                    );
-                    ui.add_space(4.0);
-                    ui.label(
-                        egui::RichText::new("自动提取PDF发票信息 · 生成Excel清单")
-                            .size(13.0)
-                            .color(TEXT_MEDIUM.gamma_multiply(0.8))
-                    );
-                    ui.add_space(24.0);
-                });
+                // 使用ScrollArea包裹整个内容
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false; 2])
+                    .show(ui, |ui| {
+                        // 顶部标题
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(8.0);
+                            ui.label(
+                                egui::RichText::new("发票识别工具")
+                                    .size(28.0)
+                                    .color(TEXT_HIGH)
+                                    .strong()
+                            );
+                            ui.add_space(4.0);
+                            ui.label(
+                                egui::RichText::new("自动提取PDF发票信息 · 生成Excel清单")
+                                    .size(13.0)
+                                    .color(TEXT_MEDIUM.gamma_multiply(0.8))
+                            );
+                            ui.add_space(20.0);
+                        });
 
-                // 左右分栏布局 - 35% : 65%
-                ui.horizontal(|ui| {
-                    // ========== 左侧：配置区 (35%) ==========
-                    ui.vertical(|ui| {
-                        ui.set_width(ui.available_width() * 0.35);
-                        
-                        egui::Frame::none()
-                            .fill(BG_CARD)
-                            .stroke(egui::Stroke::new(1.0, BORDER))
-                            .rounding(egui::Rounding::same(12.0))
-                            .inner_margin(egui::Margin::same(24.0))
-                            .show(ui, |ui| {
-                                ui.label(
-                                    egui::RichText::new("配置")
-                                        .size(16.0)
-                                        .color(TEXT_HIGH)
-                                        .strong()
-                                );
+                        // 上半部分：左右分栏（配置 + 统计日志）
+                        ui.horizontal_top(|ui| {
+                            // 左侧配置区 35%
+                            ui.vertical(|ui| {
+                                ui.set_width(ui.available_width() * 0.35);
                                 
-                                ui.add_space(24.0);
+                                egui::Frame::none()
+                                    .fill(BG_CARD)
+                                    .stroke(egui::Stroke::new(1.0, BORDER))
+                                    .rounding(egui::Rounding::same(12.0))
+                                    .inner_margin(egui::Margin::same(20.0))
+                                    .show(ui, |ui| {
+                                        ui.label(
+                                            egui::RichText::new("配置")
+                                                .size(16.0)
+                                                .color(TEXT_HIGH)
+                                                .strong()
+                                        );
+                                        ui.add_space(16.0);
 
-                                // 发票目录
-                                ui.label(
-                                    egui::RichText::new("发票目录")
-                                        .size(12.0)
-                                        .color(TEXT_MEDIUM)
-                                );
-                                ui.add_space(8.0);
-                                ui.horizontal(|ui| {
-                                    let text_edit = egui::TextEdit::singleline(&mut self.invoice_dir)
-                                        .desired_width(ui.available_width() - 40.0)
-                                        .font(egui::TextStyle::Body);
-                                    ui.add(text_edit);
-                                    
-                                    // 图标化的选择按钮
-                                    let btn = egui::Button::new(
-                                        egui::RichText::new("📁").size(16.0)
-                                    )
-                                    .fill(BG_INPUT)
-                                    .rounding(egui::Rounding::same(6.0))
-                                    .min_size(egui::vec2(32.0, 32.0));
-                                    if ui.add(btn).clicked() {
-                                        self.browse_dir_clicked = true;
-                                    }
-                                });
-                                
-                                ui.add_space(16.0);
+                                        // 发票目录
+                                        ui.label(egui::RichText::new("发票目录").size(12.0).color(TEXT_MEDIUM));
+                                        ui.add_space(6.0);
+                                        ui.horizontal(|ui| {
+                                            ui.text_edit_singleline(&mut self.invoice_dir);
+                                            if ui.button(egui::RichText::new("📁").size(15.0)).clicked() {
+                                                self.browse_dir_clicked = true;
+                                            }
+                                        });
+                                        
+                                        ui.add_space(12.0);
 
-                                // 购买方关键词
-                                ui.horizontal(|ui| {
-                                    ui.label(
-                                        egui::RichText::new("购买方关键词")
-                                            .size(12.0)
-                                            .color(TEXT_MEDIUM)
-                                    );
-                                    ui.label(
-                                        egui::RichText::new("(可选)")
-                                            .size(10.0)
-                                            .color(TEXT_LOW)
-                                    );
-                                });
-                                ui.add_space(8.0);
-                                let text_edit = egui::TextEdit::singleline(&mut self.buyer_keyword)
-                                    .hint_text("例如：阿里巴巴（不填则自动识别）")
-                                    .desired_width(ui.available_width())
-                                    .font(egui::TextStyle::Body);
-                                ui.add(text_edit);
-                                
-                                ui.add_space(16.0);
+                                        // 购买方关键词
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("购买方关键词").size(12.0).color(TEXT_MEDIUM));
+                                            ui.label(egui::RichText::new("(可选)").size(10.0).color(TEXT_LOW));
+                                        });
+                                        ui.add_space(6.0);
+                                        ui.text_edit_singleline(&mut self.buyer_keyword);
+                                        
+                                        ui.add_space(12.0);
 
-                                // 输出文件
-                                ui.label(
-                                    egui::RichText::new("输出文件")
-                                        .size(12.0)
-                                        .color(TEXT_MEDIUM)
-                                );
-                                ui.add_space(8.0);
-                                ui.horizontal(|ui| {
-                                    let text_edit = egui::TextEdit::singleline(&mut self.output_path)
-                                        .hint_text("默认保存到发票目录")
-                                        .desired_width(ui.available_width() - 40.0)
-                                        .font(egui::TextStyle::Body);
-                                    ui.add(text_edit);
-                                    
-                                    let btn = egui::Button::new(
-                                        egui::RichText::new("💾").size(16.0)
-                                    )
-                                    .fill(BG_INPUT)
-                                    .rounding(egui::Rounding::same(6.0))
-                                    .min_size(egui::vec2(32.0, 32.0));
-                                    if ui.add(btn).clicked() {
-                                        self.browse_output_clicked = true;
-                                    }
-                                });
-                                
-                                ui.add_space(32.0);
+                                        // 输出文件
+                                        ui.label(egui::RichText::new("输出文件").size(12.0).color(TEXT_MEDIUM));
+                                        ui.add_space(6.0);
+                                        ui.horizontal(|ui| {
+                                            ui.text_edit_singleline(&mut self.output_path);
+                                            if ui.button(egui::RichText::new("💾").size(15.0)).clicked() {
+                                                self.browse_output_clicked = true;
+                                            }
+                                        });
+                                        
+                                        ui.add_space(20.0);
 
-                                // 开始识别按钮 - 增强视觉效果
-                                ui.vertical_centered(|ui| {
-                                    let button_text = if self.is_processing {
-                                        "⏳ 识别中..."
-                                    } else {
-                                        "🚀 开始识别"
-                                    };
-                                    
-                                    // 渐变效果通过微阴影模拟
-                                    let button_color = if self.is_processing {
-                                        TEXT_LOW
-                                    } else {
-                                        ACCENT_SUCCESS
-                                    };
-                                    
-                                    let button = egui::Button::new(
-                                        egui::RichText::new(button_text)
-                                            .size(16.0)
-                                            .color(TEXT_HIGH)
-                                            .strong()
-                                    )
-                                    .fill(button_color)
-                                    .rounding(egui::Rounding::same(8.0))
-                                    .min_size(egui::vec2(ui.available_width(), 48.0));
-                                    
-                                    if ui.add_enabled(!self.is_processing, button).clicked() {
-                                        self.start_processing();
-                                    }
-                                });
-                            });
-                    });
-                    
-                    ui.add_space(16.0);
-
-                    // ========== 右侧：综合反馈区 (65%) ==========
-                    ui.vertical(|ui| {
-                        // 数据看板 - 4个横向卡片
-                        if self.show_result {
-                            ui.horizontal(|ui| {
-                                let card_width = (ui.available_width() - 24.0) / 4.0;
-                                ui.allocate_ui_with_layout(
-                                    egui::vec2(card_width, 80.0),
-                                    egui::Layout::top_down(egui::Align::Center),
-                                    |ui| {
-                                        self.render_data_card(ui, "总文件数", 
-                                            self.stats.total_files.to_string(), "", ACCENT_TECH);
-                                    }
-                                );
-                                ui.add_space(8.0);
-                                
-                                ui.allocate_ui_with_layout(
-                                    egui::vec2(card_width, 80.0),
-                                    egui::Layout::top_down(egui::Align::Center),
-                                    |ui| {
-                                        self.render_data_card(ui, "PDF成功率", 
-                                            format!("{:.0}", self.stats.pdf_rate()), "%", ACCENT_SUCCESS);
-                                    }
-                                );
-                                ui.add_space(8.0);
-                                
-                                ui.allocate_ui_with_layout(
-                                    egui::vec2(card_width, 80.0),
-                                    egui::Layout::top_down(egui::Align::Center),
-                                    |ui| {
-                                        self.render_data_card(ui, "识别成功率", 
-                                            format!("{:.0}", self.stats.accuracy_rate()), "%", ACCENT_SUCCESS);
-                                    }
-                                );
-                                ui.add_space(8.0);
-                                
-                                ui.allocate_ui_with_layout(
-                                    egui::vec2(card_width, 80.0),
-                                    egui::Layout::top_down(egui::Align::Center),
-                                    |ui| {
-                                        self.render_data_card(ui, "耗时", 
-                                            format!("{:.2}", self.stats.elapsed_time), "秒", TEXT_MEDIUM);
-                                    }
-                                );
+                                        // 开始按钮
+                                        let button_text = if self.is_processing { "⏳ 识别中..." } else { "🚀 开始识别" };
+                                        let button_color = if self.is_processing { TEXT_LOW } else { ACCENT_SUCCESS };
+                                        
+                                        let button = egui::Button::new(
+                                            egui::RichText::new(button_text).size(15.0).color(TEXT_HIGH).strong()
+                                        )
+                                        .fill(button_color)
+                                        .rounding(egui::Rounding::same(8.0))
+                                        .min_size(egui::vec2(ui.available_width(), 44.0));
+                                        
+                                        if ui.add_enabled(!self.is_processing, button).clicked() {
+                                            self.start_processing();
+                                        }
+                                    });
                             });
                             
                             ui.add_space(16.0);
-                            
-                            // 按钮组
-                            ui.horizontal(|ui| {
-                                let toggle_btn = egui::Button::new(
-                                    egui::RichText::new(if self.show_table { "📋 隐藏表格" } else { "📋 查看表格" })
-                                        .size(14.0)
-                                        .color(TEXT_HIGH)
-                                )
-                                .fill(BG_INPUT)
-                                .stroke(egui::Stroke::new(1.0, BORDER))
-                                .rounding(egui::Rounding::same(6.0))
-                                .min_size(egui::vec2(120.0, 36.0));
-                                if ui.add(toggle_btn).clicked() {
-                                    self.show_table = !self.show_table;
+
+                            // 右侧区域 65%
+                            ui.vertical(|ui| {
+                                // 统计卡片
+                                if self.show_result {
+                                    ui.horizontal(|ui| {
+                                        let card_width = (ui.available_width() - 24.0) / 4.0;
+                                        ui.allocate_ui_with_layout(
+                                            egui::vec2(card_width, 72.0),
+                                            egui::Layout::top_down(egui::Align::Center),
+                                            |ui| {
+                                                self.render_data_card(ui, "总文件数", 
+                                                    self.stats.total_files.to_string(), "", ACCENT_TECH);
+                                            }
+                                        );
+                                        ui.add_space(8.0);
+                                        
+                                        ui.allocate_ui_with_layout(
+                                            egui::vec2(card_width, 72.0),
+                                            egui::Layout::top_down(egui::Align::Center),
+                                            |ui| {
+                                                self.render_data_card(ui, "PDF成功率", 
+                                                    format!("{:.0}", self.stats.pdf_rate()), "%", ACCENT_SUCCESS);
+                                            }
+                                        );
+                                        ui.add_space(8.0);
+                                        
+                                        ui.allocate_ui_with_layout(
+                                            egui::vec2(card_width, 72.0),
+                                            egui::Layout::top_down(egui::Align::Center),
+                                            |ui| {
+                                                self.render_data_card(ui, "识别成功率", 
+                                                    format!("{:.0}", self.stats.accuracy_rate()), "%", ACCENT_SUCCESS);
+                                            }
+                                        );
+                                        ui.add_space(8.0);
+                                        
+                                        ui.allocate_ui_with_layout(
+                                            egui::vec2(card_width, 72.0),
+                                            egui::Layout::top_down(egui::Align::Center),
+                                            |ui| {
+                                                self.render_data_card(ui, "耗时", 
+                                                    format!("{:.2}", self.stats.elapsed_time), "秒", TEXT_MEDIUM);
+                                            }
+                                        );
+                                    });
+                                    
+                                    ui.add_space(12.0);
+                                    
+                                    // 按钮组
+                                    ui.horizontal(|ui| {
+                                        let toggle_text = if self.show_table { "📋 隐藏表格" } else { "📋 显示表格" };
+                                        if ui.button(egui::RichText::new(toggle_text).size(13.0)).clicked() {
+                                            self.show_table = !self.show_table;
+                                        }
+                                        
+                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            if ui.button(egui::RichText::new("📊 打开 Excel").size(13.0).color(TEXT_HIGH))
+                                                .clicked() {
+                                                self.open_result_clicked = true;
+                                            }
+                                        });
+                                    });
+                                    
+                                    ui.add_space(12.0);
                                 }
                                 
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    let open_btn = egui::Button::new(
-                                        egui::RichText::new("📊 打开 Excel")
-                                            .size(14.0)
-                                            .color(TEXT_HIGH)
-                                    )
-                                    .fill(ACCENT_TECH)
-                                    .rounding(egui::Rounding::same(6.0))
-                                    .min_size(egui::vec2(140.0, 36.0));
-                                    if ui.add(open_btn).clicked() {
-                                        self.open_result_clicked = true;
-                                    }
-                                });
+                                // 运行日志
+                                egui::Frame::none()
+                                    .fill(BG_CARD)
+                                    .stroke(egui::Stroke::new(1.0, BORDER))
+                                    .rounding(egui::Rounding::same(12.0))
+                                    .inner_margin(egui::Margin::same(16.0))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("运行日志").size(15.0).color(TEXT_HIGH).strong());
+                                            
+                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                if !self.log_messages.is_empty() {
+                                                    if ui.small_button("清除").clicked() {
+                                                        self.log_messages.clear();
+                                                    }
+                                                }
+                                            });
+                                        });
+                                        
+                                        ui.add_space(8.0);
+                                        
+                                        egui::Frame::none()
+                                            .fill(BG_LOG)
+                                            .rounding(egui::Rounding::same(8.0))
+                                            .inner_margin(egui::Margin::same(12.0))
+                                            .show(ui, |ui| {
+                                                let log_height = if self.show_result { 260.0 } else { 360.0 };
+                                                egui::ScrollArea::vertical()
+                                                    .max_height(log_height)
+                                                    .stick_to_bottom(true)
+                                                    .show(ui, |ui| {
+                                                        if self.log_messages.is_empty() {
+                                                            ui.vertical_centered(|ui| {
+                                                                ui.add_space(100.0);
+                                                                ui.label(egui::RichText::new("📝").size(48.0).color(TEXT_LOW));
+                                                                ui.add_space(8.0);
+                                                                ui.label(egui::RichText::new("填写配置后点击开始识别").size(13.0).color(TEXT_LOW));
+                                                            });
+                                                        } else {
+                                                            for msg in &self.log_messages {
+                                                                let color = if msg.contains("✅") {
+                                                                    ACCENT_SUCCESS
+                                                                } else if msg.contains("❌") {
+                                                                    egui::Color32::from_rgb(255, 82, 82)
+                                                                } else if msg.contains("⚡") {
+                                                                    ACCENT_TECH
+                                                                } else if msg.starts_with("━") {
+                                                                    BORDER
+                                                                } else {
+                                                                    TEXT_MEDIUM
+                                                                };
+                                                                
+                                                                ui.label(
+                                                                    egui::RichText::new(msg.as_str())
+                                                                        .size(11.5)
+                                                                        .color(color)
+                                                                        .family(egui::FontFamily::Monospace)
+                                                                );
+                                                            }
+                                                        }
+                                                    });
+                                            });
+                                    });
                             });
+                        });
+
+                        // 下半部分：全宽表格区域
+                        if self.show_result && self.show_table && !self.result_data.is_empty() {
+                            ui.add_space(20.0);
                             
-                            ui.add_space(16.0);
-                        }
-                        
-                        // 结果表格
-                        if self.show_table && !self.result_data.is_empty() {
                             egui::Frame::none()
                                 .fill(BG_CARD)
                                 .stroke(egui::Stroke::new(1.0, BORDER))
                                 .rounding(egui::Rounding::same(12.0))
-                                .inner_margin(egui::Margin::same(16.0))
+                                .inner_margin(egui::Margin::same(20.0))
                                 .show(ui, |ui| {
-                                    ui.label(
-                                        egui::RichText::new(format!("发票数据 (共{}条)", self.result_data.len()))
-                                            .size(15.0)
-                                            .color(TEXT_HIGH)
-                                            .strong()
-                                    );
+                                    ui.horizontal(|ui| {
+                                        ui.label(
+                                            egui::RichText::new(format!("发票数据 (共 {} 条)", self.result_data.len()))
+                                                .size(16.0)
+                                                .color(TEXT_HIGH)
+                                                .strong()
+                                        );
+                                        
+                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            ui.label(
+                                                egui::RichText::new("可横向滚动查看更多列")
+                                                    .size(11.0)
+                                                    .color(TEXT_LOW)
+                                                    .italics()
+                                            );
+                                        });
+                                    });
+                                    
                                     ui.add_space(12.0);
                                     
+                                    // 表格区域
                                     egui::ScrollArea::both()
-                                        .max_height(320.0)
+                                        .auto_shrink([false; 2])
+                                        .max_height(400.0)
                                         .show(ui, |ui| {
                                             use egui_extras::{TableBuilder, Column};
                                             
                                             TableBuilder::new(ui)
                                                 .striped(true)
+                                                .resizable(true)
                                                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                                                .column(Column::exact(40.0))  // 序号
-                                                .column(Column::initial(120.0).resizable(true))  // 文件名
-                                                .column(Column::initial(140.0).resizable(true))  // 发票号码
-                                                .column(Column::initial(90.0).resizable(true))   // 日期
-                                                .column(Column::initial(120.0).resizable(true))  // 购买方
-                                                .column(Column::initial(120.0).resizable(true))  // 销售方
-                                                .column(Column::initial(80.0).resizable(true))   // 金额
-                                                .header(24.0, |mut header| {
+                                                .column(Column::exact(50.0))   // 序号
+                                                .column(Column::initial(200.0).at_least(150.0))  // 文件名
+                                                .column(Column::initial(160.0).at_least(140.0))  // 发票号码
+                                                .column(Column::initial(100.0).at_least(90.0))   // 日期
+                                                .column(Column::initial(150.0).at_least(120.0))  // 购买方
+                                                .column(Column::initial(150.0).at_least(120.0))  // 销售方
+                                                .column(Column::initial(100.0).at_least(80.0))   // 金额
+                                                .column(Column::initial(120.0).at_least(100.0))  // 备注
+                                                .header(28.0, |mut header| {
                                                     header.col(|ui| {
-                                                        ui.label(egui::RichText::new("序号").size(12.0).color(TEXT_MEDIUM).strong());
+                                                        ui.strong("序号");
                                                     });
                                                     header.col(|ui| {
-                                                        ui.label(egui::RichText::new("文件名").size(12.0).color(TEXT_MEDIUM).strong());
+                                                        ui.strong("文件名");
                                                     });
                                                     header.col(|ui| {
-                                                        ui.label(egui::RichText::new("发票号码").size(12.0).color(TEXT_MEDIUM).strong());
+                                                        ui.strong("发票号码");
                                                     });
                                                     header.col(|ui| {
-                                                        ui.label(egui::RichText::new("开票日期").size(12.0).color(TEXT_MEDIUM).strong());
+                                                        ui.strong("开票日期");
                                                     });
                                                     header.col(|ui| {
-                                                        ui.label(egui::RichText::new("购买方").size(12.0).color(TEXT_MEDIUM).strong());
+                                                        ui.strong("购买方");
                                                     });
                                                     header.col(|ui| {
-                                                        ui.label(egui::RichText::new("销售方").size(12.0).color(TEXT_MEDIUM).strong());
+                                                        ui.strong("销售方");
                                                     });
                                                     header.col(|ui| {
-                                                        ui.label(egui::RichText::new("金额").size(12.0).color(TEXT_MEDIUM).strong());
+                                                        ui.strong("金额");
+                                                    });
+                                                    header.col(|ui| {
+                                                        ui.strong("备注");
                                                     });
                                                 })
                                                 .body(|mut body| {
                                                     for (idx, inv) in self.result_data.iter().enumerate() {
-                                                        body.row(22.0, |mut row| {
+                                                        body.row(24.0, |mut row| {
                                                             row.col(|ui| {
                                                                 ui.label(egui::RichText::new((idx + 1).to_string()).size(11.0).color(TEXT_LOW));
                                                             });
@@ -621,20 +633,10 @@ impl eframe::App for InvoiceApp {
                                                                 ui.label(egui::RichText::new(&inv.info.invoice_date).size(11.0).color(TEXT_MEDIUM));
                                                             });
                                                             row.col(|ui| {
-                                                                let buyer = if inv.info.buyer.len() > 12 {
-                                                                    format!("{}...", &inv.info.buyer[..12])
-                                                                } else {
-                                                                    inv.info.buyer.clone()
-                                                                };
-                                                                ui.label(egui::RichText::new(buyer).size(11.0).color(TEXT_MEDIUM));
+                                                                ui.label(egui::RichText::new(&inv.info.buyer).size(11.0).color(TEXT_MEDIUM));
                                                             });
                                                             row.col(|ui| {
-                                                                let seller = if inv.info.seller.len() > 12 {
-                                                                    format!("{}...", &inv.info.seller[..12])
-                                                                } else {
-                                                                    inv.info.seller.clone()
-                                                                };
-                                                                ui.label(egui::RichText::new(seller).size(11.0).color(TEXT_MEDIUM));
+                                                                ui.label(egui::RichText::new(&inv.info.seller).size(11.0).color(TEXT_MEDIUM));
                                                             });
                                                             row.col(|ui| {
                                                                 let amount_color = if inv.info.amount.is_empty() {
@@ -644,110 +646,18 @@ impl eframe::App for InvoiceApp {
                                                                 };
                                                                 ui.label(egui::RichText::new(&inv.info.amount).size(11.0).color(amount_color).family(egui::FontFamily::Monospace));
                                                             });
+                                                            row.col(|ui| {
+                                                                ui.label(egui::RichText::new(&inv.info.remark).size(11.0).color(TEXT_LOW));
+                                                            });
                                                         });
                                                     }
                                                 });
                                         });
                                 });
-                            
-                            ui.add_space(16.0);
                         }
                         
-                        // 运行日志
-                        egui::Frame::none()
-                            .fill(BG_CARD)
-                            .stroke(egui::Stroke::new(1.0, BORDER))
-                            .rounding(egui::Rounding::same(12.0))
-                            .inner_margin(egui::Margin::same(24.0))
-                            .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label(
-                                        egui::RichText::new("运行日志")
-                                            .size(16.0)
-                                            .color(TEXT_HIGH)
-                                            .strong()
-                                    );
-                                    
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        if !self.log_messages.is_empty() {
-                                            let clear_btn = egui::Button::new(
-                                                egui::RichText::new("清除").size(11.0)
-                                            )
-                                            .fill(egui::Color32::TRANSPARENT)
-                                            .stroke(egui::Stroke::new(1.0, BORDER))
-                                            .rounding(egui::Rounding::same(4.0));
-                                            if ui.add(clear_btn).clicked() {
-                                                self.log_messages.clear();
-                                            }
-                                        }
-                                    });
-                                });
-                                
-                                ui.add_space(16.0);
-                                
-                                // 沉浸式日志区 - 更深的背景
-                                egui::Frame::none()
-                                    .fill(BG_LOG)
-                                    .rounding(egui::Rounding::same(8.0))
-                                    .inner_margin(egui::Margin::same(16.0))
-                                    .show(ui, |ui| {
-                                        let log_height = if self.show_result { 360.0 } else { 480.0 };
-                                        egui::ScrollArea::vertical()
-                                            .max_height(log_height)
-                                            .auto_shrink([false; 2])
-                                            .stick_to_bottom(true)
-                                            .show(ui, |ui| {
-                                                ui.set_min_width(ui.available_width());
-                                                
-                                                if self.log_messages.is_empty() {
-                                                    // 空状态设计
-                                                    ui.vertical_centered(|ui| {
-                                                        ui.add_space(150.0);
-                                                        ui.label(
-                                                            egui::RichText::new("📝")
-                                                                .size(64.0)
-                                                                .color(TEXT_LOW)
-                                                        );
-                                                        ui.add_space(16.0);
-                                                        ui.label(
-                                                            egui::RichText::new("填写配置后点击开始识别")
-                                                                .size(14.0)
-                                                                .color(TEXT_LOW)
-                                                        );
-                                                        ui.add_space(8.0);
-                                                        ui.label(
-                                                            egui::RichText::new("日志信息将在此处显示")
-                                                                .size(12.0)
-                                                                .color(TEXT_LOW)
-                                                        );
-                                                    });
-                                                } else {
-                                                    for msg in &self.log_messages {
-                                                        let color = if msg.contains("✅") {
-                                                            ACCENT_SUCCESS
-                                                        } else if msg.contains("❌") {
-                                                            egui::Color32::from_rgb(255, 82, 82)
-                                                        } else if msg.contains("⚡") {
-                                                            ACCENT_TECH
-                                                        } else if msg.starts_with("━") {
-                                                            BORDER
-                                                        } else {
-                                                            TEXT_MEDIUM
-                                                        };
-                                                        
-                                                        ui.label(
-                                                            egui::RichText::new(msg.as_str())
-                                                                .size(12.0)
-                                                                .color(color)
-                                                                .family(egui::FontFamily::Monospace)
-                                                        );
-                                                    }
-                                                }
-                                            });
-                                    });
-                            });
+                        ui.add_space(20.0);
                     });
-                });
             });
     }
 }
