@@ -1,6 +1,11 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
+echo "========================================"
+echo "       发票识别工具"
+echo "========================================"
+echo ""
+
 # 查找 Python
 PYTHON_FOUND=""
 for py in /usr/bin/python3 /usr/local/bin/python3 python3; do
@@ -14,8 +19,10 @@ for py in /usr/bin/python3 /usr/local/bin/python3 python3; do
 done
 
 if [ -z "$PYTHON_FOUND" ]; then
-    osascript -e 'display dialog "未找到 Python，请先安装 Python" buttons {"OK"}' 2>/dev/null
+    echo "未找到 Python，请先安装 Python"
+    echo "访问 https://www.python.org/downloads/"
     open "https://www.python.org/downloads/"
+    read -p "按回车键退出..."
     exit 1
 fi
 
@@ -28,21 +35,28 @@ fi
 source venv/bin/activate
 pip install PyMuPDF openpyxl -q 2>/dev/null
 
-# 用户选择：图形化交互 vs 终端交互
-MODE=$(osascript << 'APPLESCRIPT' 2>/dev/null
-tell application "System Events"
-    set dialogResult to display dialog "请选择交互方式：" & return & return & "• 图形化交互 - 使用对话框选择和输入" & return & "• 终端交互 - 在终端中输入命令" buttons {"图形化交互", "终端交互", "退出"} default button 1
-    return button returned of dialogResult
-end tell
-APPLESCRIPT
-)
+# 终端内选择交互方式
+echo "请选择交互方式："
+echo "  1. 图形化交互（使用 macOS 原生对话框）"
+echo "  2. 终端交互（在终端中输入）"
+echo ""
+read -p "请输入选择 (1/2): " CHOICE
 
-if [[ "$MODE" == "退出" ]] || [[ -z "$MODE" ]]; then
-    exit 0
-fi
-
-if [[ "$MODE" == "图形化交互" ]]; then
-    exec $PYTHON_FOUND invoice_macos_dialog.py
-else
-    exec $PYTHON_FOUND invoice_extractor.py
-fi
+case "$CHOICE" in
+    1)
+        echo ""
+        echo "启动图形化交互模式..."
+        echo ""
+        exec $PYTHON_FOUND invoice_macos_dialog.py
+        ;;
+    2)
+        echo ""
+        echo "启动终端交互模式..."
+        echo ""
+        exec $PYTHON_FOUND invoice_extractor.py
+        ;;
+    *)
+        echo "无效选择，退出"
+        exit 1
+        ;;
+esac
