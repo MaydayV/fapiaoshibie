@@ -221,17 +221,25 @@ def extract_invoice_info(pdf_path, buyer_keyword=None):
         return {'备注': f'解析错误: {str(e)}'}
 
 
-def process_invoices(base_path, buyer_keyword=None, output_path=None):
+def process_invoices(base_path, buyer_keyword=None, output_path=None, log_callback=None):
     """处理所有发票文件并生成Excel
 
     Args:
         base_path: 发票文件所在目录
         buyer_keyword: 购买方公司名称关键词（用于识别购买方）
         output_path: 输出Excel文件路径
+        log_callback: 日志回调函数，用于GUI模式显示日志
     """
     # 记录开始时间
     start_time = time.time()
     all_invoices = []
+
+    # 定义日志输出函数
+    def log(msg):
+        if log_callback:
+            log_callback(msg)
+        else:
+            print(msg)
 
     for root, dirs, files in os.walk(base_path):
         files = [f for f in files if not f.startswith('.')]
@@ -402,63 +410,63 @@ def process_invoices(base_path, buyer_keyword=None, output_path=None):
         seller_stats[seller]['count'] += 1
         seller_stats[seller]['amount'] += amt
 
-    print("=" * 80)
-    print(f"{'发票识别完成':^76}")
-    print("=" * 80)
+    log("=" * 80)
+    log(f"{'发票识别完成':^76}")
+    log("=" * 80)
 
-    print(f"\n📊 文件统计:")
-    print(f"  总文件数: {len(all_invoices)}")
-    print(f"  PDF发票数: {pdf_count}")
+    log(f"\n📊 文件统计:")
+    log(f"  总文件数: {len(all_invoices)}")
+    log(f"  PDF发票数: {pdf_count}")
     if len(all_invoices) > pdf_count:
-        print(f"  其他文件(图片): {len(all_invoices) - pdf_count}")
+        log(f"  其他文件(图片): {len(all_invoices) - pdf_count}")
 
-    print(f"\n📈 识别率统计:")
-    print(f"  发票号码识别: {with_inv_num}/{pdf_count} ({with_inv_num/pdf_count*100:.1f}%)")
-    print(f"  销售方识别:   {with_seller}/{pdf_count} ({with_seller/pdf_count*100:.1f}%)")
-    print(f"  金额识别:     {with_amount}/{len(all_invoices)} ({with_amount/len(all_invoices)*100:.1f}%)")
+    log(f"\n📈 识别率统计:")
+    log(f"  发票号码识别: {with_inv_num}/{pdf_count} ({with_inv_num/pdf_count*100:.1f}%)")
+    log(f"  销售方识别:   {with_seller}/{pdf_count} ({with_seller/pdf_count*100:.1f}%)")
+    log(f"  金额识别:     {with_amount}/{len(all_invoices)} ({with_amount/len(all_invoices)*100:.1f}%)")
 
-    print(f"\n💰 金额统计:")
-    print(f"  总金额: ¥{total_amount:,.2f}")
+    log(f"\n💰 金额统计:")
+    log(f"  总金额: ¥{total_amount:,.2f}")
     if len(all_invoices) > 0:
         avg_amount = total_amount / len(all_invoices)
-        print(f"  平均金额: ¥{avg_amount:,.2f}")
+        log(f"  平均金额: ¥{avg_amount:,.2f}")
 
     # 输出重复发票号码的警告
     if duplicates:
-        print(f"\n⚠️  重复发票警告: 发现 {len(duplicates)} 条重复发票，已自动去重！")
-        print(f"  {'唯一标识':<25} {'原始文件':<30} {'重复文件':<30}")
-        print("  " + "-" * 88)
+        log(f"\n⚠️  重复发票警告: 发现 {len(duplicates)} 条重复发票，已自动去重！")
+        log(f"  {'唯一标识':<25} {'原始文件':<30} {'重复文件':<30}")
+        log("  " + "-" * 88)
         for d in duplicates[:10]:  # 最多显示10条
             orig_short = d['original'][:27] + '...' if len(d['original']) > 27 else d['original']
             dup_short = d['duplicate'][:27] + '...' if len(d['duplicate']) > 27 else d['duplicate']
-            print(f"  {d['key']:<25} {orig_short:<30} {dup_short:<30}")
+            log(f"  {d['key']:<25} {orig_short:<30} {dup_short:<30}")
         if len(duplicates) > 10:
-            print(f"  ... (还有 {len(duplicates)-10} 条重复记录未显示)")
+            log(f"  ... (还有 {len(duplicates)-10} 条重复记录未显示)")
 
     # 输出项目内容统计（Top 10）
     if item_stats:
-        print(f"\n📋 项目内容统计 (Top 10):")
+        log(f"\n📋 项目内容统计 (Top 10):")
         sorted_items = sorted(item_stats.items(), key=lambda x: x[1]['amount'], reverse=True)[:10]
         for item, data in sorted_items:
             item_short = item[:20] + '...' if len(item) > 20 else item
-            print(f"  {item_short:<25} {data['count']:>3}张  ¥{data['amount']:>10,.2f}")
+            log(f"  {item_short:<25} {data['count']:>3}张  ¥{data['amount']:>10,.2f}")
 
     # 输出销售方统计（Top 5）
     if seller_stats:
-        print(f"\n🏪 销售方统计 (Top 5):")
+        log(f"\n🏪 销售方统计 (Top 5):")
         sorted_sellers = sorted(seller_stats.items(), key=lambda x: x[1]['amount'], reverse=True)[:5]
         for seller, data in sorted_sellers:
             seller_short = seller[:20] + '...' if len(seller) > 20 else seller
-            print(f"  {seller_short:<25} {data['count']:>3}张  ¥{data['amount']:>10,.2f}")
+            log(f"  {seller_short:<25} {data['count']:>3}张  ¥{data['amount']:>10,.2f}")
 
-    print(f"\n⏱️  时间统计:")
-    print(f"  总耗时: {total_time:.2f}秒")
+    log(f"\n⏱️  时间统计:")
+    log(f"  总耗时: {total_time:.2f}秒")
     if len(all_invoices) > 0:
         avg_time = total_time / len(all_invoices)
-        print(f"  平均每份: {avg_time:.3f}秒")
+        log(f"  平均每份: {avg_time:.3f}秒")
 
-    print(f"\n💾 Excel已保存: {output_path}")
-    print("=" * 80)
+    log(f"\n💾 Excel已保存: {output_path}")
+    log("=" * 80)
 
     return output_path
 
@@ -473,7 +481,10 @@ if __name__ == "__main__":
         BASE_DIR = input("请输入发票文件所在目录路径: ").strip()
 
     # 展开 ~ 目录并清理可能的 shell 转义
-    BASE_DIR = os.path.expanduser(BASE_DIR).replace('\\ ', ' ')
+    # 注意：只在Unix-like系统上处理\ 转义，避免影响Windows网络路径
+    BASE_DIR = os.path.expanduser(BASE_DIR)
+    if os.name != 'nt':  # 非Windows系统
+        BASE_DIR = BASE_DIR.replace('\\ ', ' ')
 
     # 获取购买方公司名称关键词
     if len(sys.argv) > 2:

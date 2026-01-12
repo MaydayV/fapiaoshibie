@@ -33,7 +33,8 @@ if [ ! -d "venv" ]; then
 fi
 
 source venv/bin/activate
-pip install PyMuPDF openpyxl -q 2>/dev/null
+# 使用虚拟环境的pip，避免调用系统pip
+venv/bin/pip install PyMuPDF openpyxl -q 2>/dev/null
 
 # 终端内选择交互方式
 echo "请选择交互方式："

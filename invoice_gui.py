@@ -47,7 +47,7 @@ def process_invoices(base_path, buyer_keyword, output_path, log_callback):
     spec = importlib.util.spec_from_file_location("invoice_extractor", "invoice_extractor.py")
     extractor = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(extractor)
-    return extractor.process_invoices(base_path, buyer_keyword, output_path)
+    return extractor.process_invoices(base_path, buyer_keyword, output_path, log_callback)
 
 
 class InvoiceGUI:
@@ -147,6 +147,8 @@ class InvoiceGUI:
             self.output_entry.insert(0, filename)
 
     def log(self, message):
+        # 同时输出到GUI和终端
+        print(message)
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
         self.root.update()
@@ -168,9 +170,14 @@ class InvoiceGUI:
         output_path = self.output_entry.get().strip()
 
         # 清理路径：展开 ~ 目录并处理可能的 shell 转义
-        dir_path = os.path.expanduser(dir_path).replace('\\ ', ' ')
+        # 注意：只在Unix-like系统上处理\ 转义，避免影响Windows网络路径
+        dir_path = os.path.expanduser(dir_path)
+        if os.name != 'nt':  # 非Windows系统
+            dir_path = dir_path.replace('\\ ', ' ')
         if output_path:
-            output_path = os.path.expanduser(output_path).replace('\\ ', ' ')
+            output_path = os.path.expanduser(output_path)
+            if os.name != 'nt':  # 非Windows系统
+                output_path = output_path.replace('\\ ', ' ')
 
         if not dir_path:
             messagebox.showwarning("提示", "请选择发票目录")

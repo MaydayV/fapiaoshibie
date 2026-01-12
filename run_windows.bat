@@ -29,9 +29,9 @@ if not exist "venv" (
 REM 激活虚拟环境
 call venv\Scripts\activate.bat
 
-REM 安装依赖
+REM 安装依赖（使用虚拟环境的pip，避免调用系统pip）
 echo 检查依赖...
-pip install PyMuPDF openpyxl -q >nul 2>&1
+venv\Scripts\pip install PyMuPDF openpyxl -q >nul 2>&1
 
 REM 用户选择
 echo 请选择交互方式：
