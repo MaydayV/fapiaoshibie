@@ -9,6 +9,7 @@
 import fitz  # PyMuPDF
 import os
 import re
+import time
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
@@ -164,6 +165,8 @@ def process_invoices(base_path, buyer_keyword=None, output_path=None):
         buyer_keyword: 购买方公司名称关键词（用于识别购买方）
         output_path: 输出Excel文件路径
     """
+    # 记录开始时间
+    start_time = time.time()
     all_invoices = []
 
     for root, dirs, files in os.walk(base_path):
@@ -251,6 +254,10 @@ def process_invoices(base_path, buyer_keyword=None, output_path=None):
 
     wb.save(output_path)
 
+    # 计算耗时
+    end_time = time.time()
+    total_time = end_time - start_time
+    
     # 统计识别率
     pdf_count = sum(1 for inv in all_invoices if inv['文件名'].endswith('.pdf'))
     with_seller = sum(1 for inv in all_invoices if inv.get('销售方') and not inv['销售方'].startswith('*'))
@@ -261,6 +268,11 @@ def process_invoices(base_path, buyer_keyword=None, output_path=None):
     print(f"  PDF发票数: {pdf_count}")
     print(f"  销售方识别率: {with_seller/pdf_count*100:.1f}%")
     print(f"  金额识别率: {with_amount/len(all_invoices)*100:.1f}%")
+    print(f"\n时间统计:")
+    print(f"  总耗时: {total_time:.2f}秒")
+    if len(all_invoices) > 0:
+        avg_time = total_time / len(all_invoices)
+        print(f"  平均每份: {avg_time:.3f}秒")
     print(f"\nExcel已保存: {output_path}")
 
     return output_path

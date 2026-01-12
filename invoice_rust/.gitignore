@@ -1,0 +1,20 @@
+# Rust编译产物
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE相关
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 操作系统相关
+.DS_Store
+Thumbs.db
+
+# 测试和输出文件
+*.xlsx
+test_invoices/
