@@ -167,6 +167,11 @@ class InvoiceGUI:
         buyer_keyword = self.buyer_entry.get().strip()
         output_path = self.output_entry.get().strip()
 
+        # 清理路径：展开 ~ 目录并处理可能的 shell 转义
+        dir_path = os.path.expanduser(dir_path).replace('\\ ', ' ')
+        if output_path:
+            output_path = os.path.expanduser(output_path).replace('\\ ', ' ')
+
         if not dir_path:
             messagebox.showwarning("提示", "请选择发票目录")
             return

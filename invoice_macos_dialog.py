@@ -87,11 +87,14 @@ def main():
     
     # 步骤1：选择发票目录
     base_path = osascript_choose_folder("请选择发票所在目录:")
-    
+
     if not base_path:
         # 如果用户取消，使用命令行输入
         base_path = input("请输入发票文件所在目录路径: ").strip()
-    
+
+    # 清理路径：展开 ~ 目录并处理可能的 shell 转义
+    base_path = os.path.expanduser(base_path).replace('\\ ', ' ')
+
     if not base_path:
         print("未选择目录，程序退出")
         return
