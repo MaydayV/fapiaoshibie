@@ -1,0 +1,122 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pyinstaller PyMuPDF openpyxl
+
+      - name: Build macOS app
+        run: |
+          cd pack/build_scripts
+          chmod +x build_macos.sh
+          ./build_macos.sh
+
+      - name: Rename DMG
+        run: |
+          mv "pack/output/macos/发票提取器.dmg" "Invoice-Extractor-macOS.dmg"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-DMG
+          path: Invoice-Extractor-macOS.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller PyMuPDF openpyxl
+
+      - name: Build Windows exe
+        run: |
+          pyinstaller --clean pack/config/pyinstaller_windows.spec --distpath=pack/output/windows --workpath=pack/build/win
+
+      - name: Rename exe
+        run: |
+          ren "pack\output\windows\发票提取器.exe" "Invoice-Extractor-Windows.exe"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-EXE
+          path: pack/output/windows/Invoice-Extractor-Windows.exe
+
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macOS-DMG
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Windows-EXE
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            Invoice-Extractor-macOS.dmg
+            Invoice-Extractor-Windows.exe
+          body: |
+            ## 发票提取器 ${{ github.ref_name }}
+
+            ### 功能特点
+            - 智能识别PDF发票，自动提取发票信息
+            - 支持普通发票和高速费发票
+            - 一键生成Excel清单
+            跨平台支持（macOS / Windows）
+
+            ### 使用说明
+            1. 下载对应平台的安装包
+            2. 双击运行，点击"开始使用"
+            3. 选择发票所在目录
+            4. 输入购买方公司名称关键词
+            5. 选择Excel保存位置
+            6. 确认后开始处理
+
+            ### 系统要求
+            - macOS 11.0 或更高版本
+            - Windows 10 或更高版本
+
+            ### 开发者
+            阿凯(MaydayV)
+            https://github.com/MaydayV
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
