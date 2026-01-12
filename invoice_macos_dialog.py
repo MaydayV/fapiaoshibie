@@ -85,11 +85,16 @@ def show_welcome():
     """显示欢迎对话框"""
     # 使用简单的 AppleScript alert
     script = '''display alert "发票提取器 v1.0.0" ¬
-        message "智能识别PDF发票，自动提取发票信息\\n支持普通发票和高速费发票，一键生成Excel清单\\n\\n开发者: MaydayV" ¬
-        buttons {"开始使用", "退出"} default button 1
+        message "智能识别PDF发票，自动提取发票信息\\n支持普通发票和高速费发票，一键生成Excel清单\\n\\n开发者: 阿凯" ¬
+        buttons {"访问主页", "开始使用", "退出"} default button 2
 return button returned of result'''
 
     result = run_osascript(script)
+    if result == "访问主页":
+        # 打开开发者 GitHub 主页
+        subprocess.run(['open', 'https://github.com/MaydayV'])
+        # 再次显示欢迎对话框
+        return show_welcome()
     return result == "开始使用"
 
 

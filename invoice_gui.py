@@ -10,6 +10,8 @@ from tkinter import filedialog, messagebox, scrolledtext
 import threading
 import os
 import sys
+import webbrowser
+from urllib.parse import quote
 
 
 def get_resource_path(relative_path):
@@ -60,6 +62,36 @@ def process_invoices(base_path, buyer_keyword, output_path, log_callback):
     extractor = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(extractor)
     return extractor.process_invoices(base_path, buyer_keyword, output_path, log_callback)
+
+
+class LinkLabel(tk.Label):
+    """可点击的超链接标签"""
+    def __init__(self, parent, text, url, **kwargs):
+        # 设置默认样式
+        default_fg = kwargs.pop('fg', '#007AFF')  # 蓝色
+        kwargs['fg'] = default_fg
+        kwargs['cursor'] = 'hand2'
+        super().__init__(parent, text=text, **kwargs)
+
+        self.url = url
+        self.default_fg = default_fg
+        self.hover_fg = '#0051D5'  # 深蓝色
+
+        self.bind('<Enter>', self._on_enter)
+        self.bind('<Leave>', self._on_leave)
+        self.bind('<Button-1>', self._on_click)
+
+    def _on_enter(self, event):
+        """鼠标悬停时改变颜色"""
+        self.config(fg=self.hover_fg)
+
+    def _on_leave(self, event):
+        """鼠标离开时恢复颜色"""
+        self.config(fg=self.default_fg)
+
+    def _on_click(self, event):
+        """点击时打开链接"""
+        webbrowser.open(self.url)
 
 
 class WelcomeWindow:
@@ -166,14 +198,23 @@ class WelcomeWindow:
         info_frame = tk.Frame(main_frame, bg="#f5f5f7")
         info_frame.pack(side=tk.BOTTOM, pady=(20, 0))
 
-        dev_label = tk.Label(
+        dev_text = tk.Label(
             info_frame,
-            text="开发者: MaydayV",
+            text="开发者: ",
             font=("Microsoft YaHei UI", 10),
             bg="#f5f5f7",
             fg="#86868b"
         )
-        dev_label.pack()
+        dev_text.pack(side=tk.LEFT)
+
+        dev_link = LinkLabel(
+            info_frame,
+            text="阿凯(MaydayV)",
+            url="https://github.com/MaydayV",
+            font=("Microsoft YaHei UI", 10),
+            bg="#f5f5f7"
+        )
+        dev_link.pack(side=tk.LEFT)
 
     def start_extract(self):
         """开始提取流程"""
