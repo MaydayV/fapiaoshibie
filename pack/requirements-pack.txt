@@ -1,0 +1,4 @@
+# 发票识别工具打包依赖
+# 安装命令: pip install -r requirements-pack.txt
+
+pyinstaller>=5.13.0

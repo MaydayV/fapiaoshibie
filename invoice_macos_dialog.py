@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-发票识别工具 - macOS 原生对话框版本
-使用 osascript 实现交互，无需 tkinter
+发票提取器 - macOS 版本
+纯 AppleScript 对话框实现（不依赖 tkinter）
 """
 
 import sys
 import os
 import subprocess
 import importlib.util
-import shlex
+
+
+def get_resource_path(relative_path):
+    """获取资源文件的绝对路径（兼容 PyInstaller 打包后的路径）"""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(__file__), relative_path)
 
 
 def run_osascript(script, timeout=300):
@@ -28,7 +34,6 @@ def run_osascript(script, timeout=300):
     except subprocess.TimeoutExpired:
         return None
     except Exception as e:
-        print(f"osascript错误: {e}")
         return None
 
 
@@ -36,8 +41,6 @@ def osascript_dialog(text, buttons, default_button=1):
     """显示 macOS 原生对话框，返回用户点击的按钮"""
     button_list = buttons.split(',')
     button_script = ','.join([f'"{b}"' for b in button_list])
-
-    # 转义特殊字符
     escaped_text = text.replace('"', '\\"').replace('\\', '\\\\')
 
     script = f'''display dialog "{escaped_text}" buttons {{{button_script}}} default button {default_button}
@@ -77,54 +80,58 @@ return POSIX path of dialogResult
 '''
     return run_osascript(script)
 
-def main():
+
+def show_welcome():
+    """显示欢迎对话框"""
+    # 使用简单的 AppleScript alert
+    script = '''display alert "发票提取器 v1.0.0" ¬
+        message "智能识别PDF发票，自动提取发票信息\\n支持普通发票和高速费发票，一键生成Excel清单\\n\\n开发者: MaydayV" ¬
+        buttons {"开始使用", "退出"} default button 1
+return button returned of result'''
+
+    result = run_osascript(script)
+    return result == "开始使用"
+
+
+def run_extraction():
+    """执行发票提取流程"""
     print("="*50)
-    print("       发票识别工具")
+    print("       发票提取器")
     print("="*50)
-    
-    # 检查依赖
-    try:
-        import fitz
-        import openpyxl
-    except ImportError:
-        print("正在安装依赖...")
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'PyMuPDF', 'openpyxl'])
-        print("依赖安装完成！")
-    
+
     # 步骤1：选择发票目录
     base_path = osascript_choose_folder("请选择发票所在目录:")
 
     if not base_path:
-        # 如果用户取消，使用命令行输入
-        base_path = input("请输入发票文件所在目录路径: ").strip()
+        print("未选择目录，程序退出")
+        return
 
-    # 清理路径：展开 ~ 目录并处理可能的 shell 转义
-    # 注意：只在Unix-like系统上处理\ 转义，避免影响Windows网络路径
+    # 清理路径
     base_path = os.path.expanduser(base_path)
-    if os.name != 'nt':  # 非Windows系统
+    if os.name != 'nt':
         base_path = base_path.replace('\\ ', ' ')
 
     if not base_path:
         print("未选择目录，程序退出")
         return
-    
+
     # 步骤2：输入购买方关键词
     buyer_keyword = osascript_input_dialog("请输入购买方公司名称关键词:")
-    
+
     if buyer_keyword is None:
-        buyer_keyword = input("请输入购买方公司名称关键词: ").strip()
-    
+        buyer_keyword = ""
+
     if not buyer_keyword:
         print("未输入关键词，程序退出")
         return
-    
+
     # 步骤3：选择输出文件（可选）
     output_path = osascript_choose_file("选择Excel保存位置", "发票清单.xlsx")
-    
+
     if not output_path:
         output_path = os.path.join(base_path, "发票清单.xlsx")
-    
-    # 显示确认信息（AppleScript使用实际换行，不是\n转义）
+
+    # 显示确认信息
     confirm_msg = f'''请确认：
 
 发票目录: {base_path}
@@ -133,11 +140,11 @@ def main():
 
 开始处理？'''
     confirm = osascript_dialog(confirm_msg, "开始处理,取消", 1)
-    
+
     if confirm != "开始处理":
         print("已取消")
         return
-    
+
     # 执行处理
     print()
     print("-"*50)
@@ -146,19 +153,18 @@ def main():
     print(f"输出文件: {output_path}")
     print("-"*50)
     print()
-    
+
     # 导入并运行主程序
-    spec = importlib.util.spec_from_file_location("invoice_extractor", "invoice_extractor.py")
+    extractor_path = get_resource_path("invoice_extractor.py")
+    spec = importlib.util.spec_from_file_location("invoice_extractor", extractor_path)
     extractor = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(extractor)
 
-    # 传递日志回调函数
     def log_callback(msg):
-        # macOS对话框模式下继续使用print输出到终端
         print(msg)
 
     extractor.process_invoices(base_path, buyer_keyword, output_path, log_callback)
-    
+
     # 完成提示
     complete_msg = f'''处理完成！
 
@@ -166,11 +172,25 @@ def main():
 {output_path}'''
     osascript_dialog(complete_msg, "确定")
 
+
+def main():
+    # 检查依赖
+    try:
+        import fitz
+        import openpyxl
+    except ImportError:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'PyMuPDF', 'openpyxl'])
+
+    # 显示欢迎界面
+    if show_welcome():
+        run_extraction()
+
+
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\\n程序已取消")
+        print("\n程序已取消")
     except Exception as e:
         print(f"错误: {e}")
         import traceback

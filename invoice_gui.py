@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-发票识别脚本 - 图形界面版本 (Windows/Linux)
+发票提取器 - Windows/Linux 版本
+欢迎界面 + 提取界面
 """
 
 import tkinter as tk
@@ -9,6 +10,16 @@ from tkinter import filedialog, messagebox, scrolledtext
 import threading
 import os
 import sys
+
+
+def get_resource_path(relative_path):
+    """获取资源文件的绝对路径（兼容 PyInstaller 打包后的路径）
+
+    PyInstaller 打包后，资源文件会被解压到 sys._MEIPASS 临时目录
+    """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(__file__), relative_path)
 
 
 def check_and_install_deps():
@@ -44,17 +55,139 @@ def install_deps(callback):
 def process_invoices(base_path, buyer_keyword, output_path, log_callback):
     """处理发票并生成Excel"""
     import importlib.util
-    spec = importlib.util.spec_from_file_location("invoice_extractor", "invoice_extractor.py")
+    extractor_path = get_resource_path("invoice_extractor.py")
+    spec = importlib.util.spec_from_file_location("invoice_extractor", extractor_path)
     extractor = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(extractor)
     return extractor.process_invoices(base_path, buyer_keyword, output_path, log_callback)
 
 
-class InvoiceGUI:
+class WelcomeWindow:
+    """欢迎窗口"""
     def __init__(self, root):
         self.root = root
-        self.root.title("发票识别工具")
-        self.root.geometry("550x450")
+        self.root.title("发票提取器")
+        self.root.geometry("480x360")
+        self.root.resizable(False, False)
+        self.root.configure(bg="#f5f5f7")
+
+        self.center_window()
+        self.setup_ui()
+
+    def center_window(self):
+        """窗口居中"""
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        self.root.geometry(f'{width}x{height}+{x}+{y}')
+
+    def setup_ui(self):
+        """设置界面"""
+        # 主容器
+        main_frame = tk.Frame(self.root, bg="#f5f5f7")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=40, pady=40)
+
+        # 图标/标题区域
+        title_frame = tk.Frame(main_frame, bg="#f5f5f7")
+        title_frame.pack(pady=(0, 20))
+
+        # 图标
+        icon_label = tk.Label(
+            title_frame,
+            text="📄",
+            font=("Microsoft YaHei UI", 48),
+            bg="#f5f5f7",
+            fg="#007AFF"
+        )
+        icon_label.pack()
+
+        # 软件名称
+        name_label = tk.Label(
+            title_frame,
+            text="发票提取器",
+            font=("Microsoft YaHei UI", 24, "bold"),
+            bg="#f5f5f7",
+            fg="#1d1d1f"
+        )
+        name_label.pack(pady=(8, 4))
+
+        # 版本号
+        version_label = tk.Label(
+            title_frame,
+            text="版本 1.0.0",
+            font=("Microsoft YaHei UI", 11),
+            bg="#f5f5f7",
+            fg="#86868b"
+        )
+        version_label.pack()
+
+        # 分隔线
+        separator = tk.Frame(main_frame, bg="#e5e5e5", height=1)
+        separator.pack(fill=tk.X, pady=(20, 20))
+
+        # 功能说明
+        desc_frame = tk.Frame(main_frame, bg="#f5f5f7")
+        desc_frame.pack(pady=(0, 20))
+
+        desc_label = tk.Label(
+            desc_frame,
+            text="智能识别PDF发票，自动提取发票信息\n支持普通发票和高速费发票，一键生成Excel清单",
+            font=("Microsoft YaHei UI", 12),
+            bg="#f5f5f7",
+            fg="#3a3a3c",
+            justify=tk.CENTER
+        )
+        desc_label.pack()
+
+        # 按钮区域
+        button_frame = tk.Frame(main_frame, bg="#f5f5f7")
+        button_frame.pack(pady=(10, 0))
+
+        # 提取发票按钮
+        extract_btn = tk.Button(
+            button_frame,
+            text="提取发票",
+            font=("Microsoft YaHei UI", 13, "bold"),
+            bg="#007AFF",
+            fg="white",
+            activebackground="#0051D5",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=40,
+            pady=12,
+            command=self.start_extract
+        )
+        extract_btn.pack()
+
+        # 开发者信息
+        info_frame = tk.Frame(main_frame, bg="#f5f5f7")
+        info_frame.pack(side=tk.BOTTOM, pady=(20, 0))
+
+        dev_label = tk.Label(
+            info_frame,
+            text="开发者: MaydayV",
+            font=("Microsoft YaHei UI", 10),
+            bg="#f5f5f7",
+            fg="#86868b"
+        )
+        dev_label.pack()
+
+    def start_extract(self):
+        """开始提取流程"""
+        self.root.destroy()
+        # 打开主界面
+        MainWindow()
+
+
+class MainWindow:
+    """主窗口"""
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("发票提取器")
+        self.root.geometry("600x500")
         self.root.resizable(True, True)
 
         # 检查依赖
@@ -69,57 +202,75 @@ class InvoiceGUI:
 
     def setup_ui(self):
         # 主框架
-        main_frame = tk.Frame(self.root, padx=15, pady=15)
+        main_frame = tk.Frame(self.root, padx=20, pady=20, bg="white")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # 标题
-        title_label = tk.Label(main_frame, text="📄 发票识别工具",
-                              font=("Arial", 16, "bold"))
-        title_label.pack(pady=(0, 15))
+        # 标题栏
+        title_frame = tk.Frame(main_frame, bg="white")
+        title_frame.pack(fill=tk.X, pady=(0, 15))
+
+        tk.Label(
+            title_frame,
+            text="📄 发票提取",
+            font=("Microsoft YaHei UI", 16, "bold"),
+            bg="white",
+            fg="#1d1d1f"
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            title_frame,
+            text="← 返回",
+            font=("Microsoft YaHei UI", 9),
+            bg="#f5f5f7",
+            fg="#86868b",
+            relief=tk.FLAT,
+            cursor="hand2",
+            command=self.back_to_welcome
+        ).pack(side=tk.RIGHT)
 
         # 配置区域
-        config_frame = tk.LabelFrame(main_frame, text="配置选项", padx=10, pady=10)
+        config_frame = tk.LabelFrame(main_frame, text="配置选项", padx=15, pady=15, bg="white")
         config_frame.pack(fill=tk.X, pady=(0, 10))
 
         # 发票目录
-        tk.Label(config_frame, text="发票目录:").grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.dir_entry = tk.Entry(config_frame, width=35)
-        self.dir_entry.grid(row=0, column=1, pady=5, padx=5)
-        tk.Button(config_frame, text="浏览...", command=self.browse_dir,
-                 width=8).grid(row=0, column=2)
+        tk.Label(config_frame, text="发票目录:", bg="white").grid(row=0, column=0, sticky=tk.W, pady=8)
+        self.dir_entry = tk.Entry(config_frame, width=40, font=("Microsoft YaHei UI", 10))
+        self.dir_entry.grid(row=0, column=1, pady=8, padx=5, sticky=tk.W)
+        tk.Button(config_frame, text="浏览...", command=self.browse_dir, width=10).grid(row=0, column=2, padx=5)
 
         # 购买方关键词
-        tk.Label(config_frame, text="购买方关键词:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.buyer_entry = tk.Entry(config_frame, width=35)
-        self.buyer_entry.grid(row=1, column=1, pady=5, padx=5)
+        tk.Label(config_frame, text="购买方关键词:", bg="white").grid(row=1, column=0, sticky=tk.W, pady=8)
+        self.buyer_entry = tk.Entry(config_frame, width=40, font=("Microsoft YaHei UI", 10))
+        self.buyer_entry.grid(row=1, column=1, pady=8, padx=5, sticky=tk.W)
 
         # 输出文件
-        tk.Label(config_frame, text="输出文件:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.output_entry = tk.Entry(config_frame, width=35)
-        self.output_entry.grid(row=2, column=1, pady=5, padx=5)
-        tk.Button(config_frame, text="浏览...", command=self.browse_output,
-                 width=8).grid(row=2, column=2)
+        tk.Label(config_frame, text="输出文件:", bg="white").grid(row=2, column=0, sticky=tk.W, pady=8)
+        self.output_entry = tk.Entry(config_frame, width=40, font=("Microsoft YaHei UI", 10))
+        self.output_entry.grid(row=2, column=1, pady=8, padx=5, sticky=tk.W)
+        tk.Button(config_frame, text="浏览...", command=self.browse_output, width=10).grid(row=2, column=2, padx=5)
+
+        config_frame.columnconfigure(1, weight=1)
 
         # 日志区域
-        log_frame = tk.LabelFrame(main_frame, text="运行日志", padx=10, pady=10)
+        log_frame = tk.LabelFrame(main_frame, text="运行日志", padx=10, pady=10, bg="white")
         log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=60)
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=12, width=70, font=("Consolas", 9))
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
         # 按钮区域
-        btn_frame = tk.Frame(main_frame)
+        btn_frame = tk.Frame(main_frame, bg="white")
         btn_frame.pack(fill=tk.X)
 
         self.install_btn = tk.Button(btn_frame, text="安装依赖", bg="#f39c12", fg="white",
-                                    command=self.install_deps, width=10)
+                                    command=self.install_deps, width=12, font=("Microsoft YaHei UI", 10))
         self.install_btn.pack(side=tk.LEFT, padx=(0, 10))
 
         if self.deps_ok:
             self.install_btn.config(state=tk.DISABLED, text="依赖已安装")
 
-        self.run_btn = tk.Button(btn_frame, text="开始识别", bg="#27ae60", fg="white",
-                                 command=self.run_extractor, font=("Arial", 10, "bold"),
+        self.run_btn = tk.Button(btn_frame, text="开始提取", bg="#27ae60", fg="white",
+                                 command=self.run_extractor, font=("Microsoft YaHei UI", 10, "bold"),
                                  width=12)
         self.run_btn.pack(side=tk.RIGHT)
 
@@ -127,8 +278,13 @@ class InvoiceGUI:
         self.status_var = tk.StringVar()
         self.status_var.set("就绪")
         status_bar = tk.Label(main_frame, textvariable=self.status_var,
-                              relief=tk.SUNKEN, anchor=tk.W)
+                              relief=tk.SUNKEN, anchor=tk.W, bg="#f5f5f7", fg="#86868b")
         status_bar.pack(fill=tk.X, pady=(10, 0))
+
+    def back_to_welcome(self):
+        """返回欢迎界面"""
+        self.root.destroy()
+        WelcomeWindow(tk.Tk())
 
     def browse_dir(self):
         directory = filedialog.askdirectory(title="选择发票所在目录")
@@ -147,7 +303,6 @@ class InvoiceGUI:
             self.output_entry.insert(0, filename)
 
     def log(self, message):
-        # 同时输出到GUI和终端
         print(message)
         self.log_text.insert(tk.END, message + "\n")
         self.log_text.see(tk.END)
@@ -169,14 +324,13 @@ class InvoiceGUI:
         buyer_keyword = self.buyer_entry.get().strip()
         output_path = self.output_entry.get().strip()
 
-        # 清理路径：展开 ~ 目录并处理可能的 shell 转义
-        # 注意：只在Unix-like系统上处理\ 转义，避免影响Windows网络路径
+        # 清理路径
         dir_path = os.path.expanduser(dir_path)
-        if os.name != 'nt':  # 非Windows系统
+        if os.name != 'nt':
             dir_path = dir_path.replace('\\ ', ' ')
         if output_path:
             output_path = os.path.expanduser(output_path)
-            if os.name != 'nt':  # 非Windows系统
+            if os.name != 'nt':
                 output_path = output_path.replace('\\ ', ' ')
 
         if not dir_path:
@@ -212,7 +366,7 @@ class InvoiceGUI:
         thread.start()
 
     def complete(self, success, result):
-        self.run_btn.config(state=tk.NORMAL, text="开始识别")
+        self.run_btn.config(state=tk.NORMAL, text="开始提取")
 
         if success:
             self.log("="*50)
@@ -220,7 +374,7 @@ class InvoiceGUI:
             self.log(f"📁 输出文件: {result}")
             self.log("="*50)
             self.status_var.set("处理完成")
-            messagebox.showinfo("完成", f"发票识别完成！\n\n输出文件: {result}")
+            messagebox.showinfo("完成", f"发票提取完成！\n\n输出文件: {result}")
         else:
             self.log(f"❌ 处理失败: {result}")
             self.status_var.set("处理失败")
@@ -229,7 +383,7 @@ class InvoiceGUI:
 
 def main():
     root = tk.Tk()
-    app = InvoiceGUI(root)
+    app = WelcomeWindow(root)
     root.mainloop()
 
 
