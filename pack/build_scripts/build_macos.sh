@@ -54,6 +54,9 @@ fi
 
 echo ""
 
+# App 名称
+APP_NAME="发票提取器"
+
 # 创建输出目录
 mkdir -p "$PACK_DIR/output/macos"
 
@@ -61,6 +64,9 @@ mkdir -p "$PACK_DIR/output/macos"
 echo "清理旧的构建文件..."
 rm -rf "$PACK_DIR/build/"
 rm -rf "$PACK_DIR/dist/"
+rm -rf "$PACK_DIR/output/macos/$APP_NAME"
+rm -rf "$PACK_DIR/output/macos/$APP_NAME.app"
+rm -f "$PACK_DIR/output/macos/$APP_NAME.dmg"
 
 # 切换到项目目录进行打包
 cd "$PROJECT_DIR"
@@ -72,7 +78,6 @@ pyinstaller --clean "$PACK_DIR/config/pyinstaller_macos.spec" \
     --distpath="$PACK_DIR/output/macos"
 
 # 检查构建结果（app是目录不是文件）
-APP_NAME="发票提取器"
 if [ -d "$PACK_DIR/output/macos/$APP_NAME.app" ]; then
     echo ""
     echo "========================================"

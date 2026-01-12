@@ -25,13 +25,27 @@ jobs:
 
       - name: Build macOS app
         run: |
-          cd pack/build_scripts
-          chmod +x build_macos.sh
-          ./build_macos.sh
+          # Clean output directory
+          rm -rf pack/output/macos/发票提取器
+          rm -rf pack/output/macos/发票提取器.app
+          rm -f pack/output/macos/发票提取器.dmg
+
+          # Build with PyInstaller
+          pyinstaller --clean pack/config/pyinstaller_macos.spec \
+            --workpath=pack/build/mac \
+            --distpath=pack/output/macos
+
+      - name: Create DMG
+        run: |
+          hdiutil create -volname "发票提取器" \
+                         -srcfolder pack/output/macos/发票提取器.app \
+                         -ov \
+                         -format UDZO \
+                         -imagekey zlib-level=9 \
+                         "pack/output/macos/发票提取器.dmg"
 
       - name: Rename DMG
-        run: |
-          mv "pack/output/macos/发票提取器.dmg" "Invoice-Extractor-macOS.dmg"
+        run: mv "pack/output/macos/发票提取器.dmg" "Invoice-Extractor-macOS.dmg"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
@@ -60,8 +74,7 @@ jobs:
           pyinstaller --clean pack/config/pyinstaller_windows.spec --distpath=pack/output/windows --workpath=pack/build/win
 
       - name: Rename exe
-        run: |
-          ren "pack\output\windows\发票提取器.exe" "Invoice-Extractor-Windows.exe"
+        run: ren "pack\output\windows\发票提取器.exe" "Invoice-Extractor-Windows.exe"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -99,7 +112,7 @@ jobs:
             - 智能识别PDF发票，自动提取发票信息
             - 支持普通发票和高速费发票
             - 一键生成Excel清单
-            跨平台支持（macOS / Windows）
+            - 跨平台支持（macOS / Windows）
 
             ### 使用说明
             1. 下载对应平台的安装包
