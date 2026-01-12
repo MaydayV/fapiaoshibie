@@ -5,6 +5,15 @@
 ![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
+## 项目结构
+
+本项目包含多个子项目，满足不同使用场景：
+
+| 子项目 | 说明 | 链接 |
+|--------|------|------|
+| 📦 **pack** | 打包工具，将 Python 版本打包成可执行文件 | [查看详情](pack/) |
+| 🦀 **invoice_rust** | Rust 版本，高性能 + 现代化 GUI 界面 | [查看详情](invoice_rust/) |
+
 ## 功能特点
 
 - 🖥️ **两种交互方式** - 图形化对话框 / 终端命令行
