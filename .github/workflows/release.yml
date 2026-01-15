@@ -50,6 +50,9 @@ jobs:
           name: macOS-DMG
           path: pack/output/macos/发票提取器.dmg
 
+      - name: Rename macOS file
+        run: mv "pack/output/macos/发票提取器.dmg" "InvoiceExtractor-macOS.dmg"
+
   build-windows:
     runs-on: windows-latest
     steps:
@@ -70,11 +73,14 @@ jobs:
         run: |
           pyinstaller --clean pack/config/pyinstaller_windows.spec --distpath=pack/output/windows --workpath=pack/build/win
 
+      - name: Rename Windows file
+        run: ren "pack\output\windows\发票提取器.exe" "InvoiceExtractor-Windows.exe"
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: Windows-EXE
-          path: pack/output/windows/发票提取器.exe
+          path: pack/output/windows/InvoiceExtractor-Windows.exe
 
   release:
     needs: [build-macos, build-windows]
@@ -97,14 +103,8 @@ jobs:
       - name: Rename files
         run: |
           ls -la
-          # 重命名 dmg 文件（如果需要）
-          for f in *.dmg; do
-            if [ -f "$f" ] && [ "$f" != "发票提取器.dmg" ]; then
-              mv "$f" 发票提取器.dmg
-            fi
-          done
-          # 重命名 exe 文件（如果需要）
-          find . -type f -name "*.exe" ! -name "发票提取器.exe" -exec mv {} 发票提取器.exe \;
+          for f in *.dmg; do [ -f "$f" ] && mv "$f" InvoiceExtractor-macOS.dmg && break; done
+          for f in *.exe; do [ -f "$f" ] && mv "$f" InvoiceExtractor-Windows.exe && break; done
           ls -la
 
       - name: Create Release
@@ -112,8 +112,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            发票提取器.dmg
-            发票提取器.exe
+            InvoiceExtractor-macOS.dmg
+            InvoiceExtractor-Windows.exe
           body: |
             ## 发票提取器 ${{ github.ref_name }}
 
