@@ -143,6 +143,9 @@ class MainWindow:
         # 启动日志处理
         self.process_log_queue()
 
+        # 设置初始默认输出文件名（在当前用户目录）
+        self._set_initial_default_output()
+
         if not deps_ok:
             self.log(f"⚠️ {deps_msg}")
             self.log("请点击下方按钮安装依赖...")
@@ -279,10 +282,65 @@ class MainWindow:
         if directory:
             self.dir_entry.delete(0, tk.END)
             self.dir_entry.insert(0, directory)
+            # 自动设置默认输出文件路径
+            self._set_default_output_path()
+
+    def _set_default_output_path(self):
+        """根据发票目录设置默认输出文件路径"""
+        dir_path = self.dir_entry.get().strip()
+        if not dir_path:
+            return
+
+        # 生成默认文件名：发票整理_年月日.xlsx
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y%m%d")
+        default_filename = f"发票整理_{date_str}.xlsx"
+        default_path = os.path.join(dir_path, default_filename)
+
+        # 如果输出文件为空或者是之前的默认路径，则更新
+        current = self.output_entry.get().strip()
+        if not current or "发票整理_" in current:
+            self.output_entry.delete(0, tk.END)
+            self.output_entry.insert(0, default_path)
+
+    def _set_initial_default_output(self):
+        """设置初始默认输出文件名"""
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y%m%d")
+        default_filename = f"发票整理_{date_str}.xlsx"
+
+        # 尝试使用桌面目录作为默认位置
+        try:
+            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+            if os.path.exists(desktop):
+                default_path = os.path.join(desktop, default_filename)
+            else:
+                default_path = default_filename
+        except:
+            default_path = default_filename
+
+        self.output_entry.insert(0, default_path)
 
     def browse_output(self):
+        # 获取当前输出路径或生成默认路径
+        current_path = self.output_entry.get().strip()
+        if not current_path:
+            dir_path = self.dir_entry.get().strip()
+            if dir_path:
+                from datetime import datetime
+                date_str = datetime.now().strftime("%Y%m%d")
+                current_path = os.path.join(dir_path, f"发票整理_{date_str}.xlsx")
+            else:
+                current_path = "发票整理_20240101.xlsx"
+
+        # 获取目录和默认文件名
+        initial_dir = os.path.dirname(current_path)
+        initial_file = os.path.basename(current_path)
+
         filename = filedialog.asksaveasfilename(
             title="选择输出文件",
+            initialdir=initial_dir,
+            initialfile=initial_file,
             defaultextension=".xlsx",
             filetypes=[("Excel文件", "*.xlsx"), ("所有文件", "*.*")]
         )
