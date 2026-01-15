@@ -97,15 +97,14 @@ jobs:
       - name: Rename files
         run: |
           ls -la
-          # 查找并重命名 dmg 文件
+          # 重命名 dmg 文件（如果需要）
           for f in *.dmg; do
-            if [ -f "$f" ]; then
+            if [ -f "$f" ] && [ "$f" != "发票提取器.dmg" ]; then
               mv "$f" 发票提取器.dmg
-              break
             fi
           done
-          # 查找并重命名 exe 文件（可能在子目录）
-          find . -type f -name "*.exe" -exec mv {} 发票提取器.exe \;
+          # 重命名 exe 文件（如果需要）
+          find . -type f -name "*.exe" ! -name "发票提取器.exe" -exec mv {} 发票提取器.exe \;
           ls -la
 
       - name: Create Release
