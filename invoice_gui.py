@@ -12,6 +12,36 @@ import os
 import sys
 import webbrowser
 from urllib.parse import quote
+import platform
+
+
+def get_default_font():
+    """获取系统默认中文字体，带回退机制"""
+    system = platform.system()
+
+    if system == "Windows":
+        # Windows 字体回退列表
+        fonts = ["Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "Arial"]
+    elif system == "Darwin":  # macOS
+        fonts = ["PingFang SC", "STHeiti", "Helvetica"]
+    else:  # Linux
+        fonts = ["WenQuanYi Micro Hei", "SimHei", "Arial"]
+
+    # 尝试找到可用字体
+    for font_name in fonts:
+        try:
+            # 测试字体是否可用
+            test_font = (font_name, 10)
+            return font_name
+        except:
+            continue
+
+    # 如果都不可用，返回空字符串让系统自动选择
+    return ""
+
+
+# 获取默认字体名称
+DEFAULT_FONT = get_default_font()
 
 
 def get_resource_path(relative_path):
@@ -129,7 +159,7 @@ class WelcomeWindow:
         icon_label = tk.Label(
             title_frame,
             text="📄",
-            font=("Microsoft YaHei UI", 48),
+            font=(DEFAULT_FONT, 48),
             bg="#f5f5f7",
             fg="#007AFF"
         )
@@ -139,7 +169,7 @@ class WelcomeWindow:
         name_label = tk.Label(
             title_frame,
             text="发票提取器",
-            font=("Microsoft YaHei UI", 24, "bold"),
+            font=(DEFAULT_FONT, 24, "bold"),
             bg="#f5f5f7",
             fg="#1d1d1f"
         )
@@ -149,7 +179,7 @@ class WelcomeWindow:
         version_label = tk.Label(
             title_frame,
             text="版本 1.0.0",
-            font=("Microsoft YaHei UI", 11),
+            font=(DEFAULT_FONT, 11),
             bg="#f5f5f7",
             fg="#86868b"
         )
@@ -166,7 +196,7 @@ class WelcomeWindow:
         desc_label = tk.Label(
             desc_frame,
             text="智能识别PDF发票，自动提取发票信息\n支持普通发票和高速费发票，一键生成Excel清单",
-            font=("Microsoft YaHei UI", 12),
+            font=(DEFAULT_FONT, 12),
             bg="#f5f5f7",
             fg="#3a3a3c",
             justify=tk.CENTER
@@ -181,16 +211,18 @@ class WelcomeWindow:
         extract_btn = tk.Button(
             button_frame,
             text="提取发票",
-            font=("Microsoft YaHei UI", 13, "bold"),
+            font=(DEFAULT_FONT, 13, "bold"),
             bg="#007AFF",
             fg="white",
             activebackground="#0051D5",
             activeforeground="white",
-            relief=tk.FLAT,
+            relief=tk.RAISED,  # Windows 不支持 FLAT 样式的自定义颜色按钮
             cursor="hand2",
             padx=40,
             pady=12,
-            command=self.start_extract
+            command=self.start_extract,
+            bd=1,  # 设置边框宽度
+            highlightthickness=0  # 移除焦点边框
         )
         extract_btn.pack()
 
@@ -201,7 +233,7 @@ class WelcomeWindow:
         dev_text = tk.Label(
             info_frame,
             text="开发者: ",
-            font=("Microsoft YaHei UI", 10),
+            font=(DEFAULT_FONT, 10),
             bg="#f5f5f7",
             fg="#86868b"
         )
@@ -211,7 +243,7 @@ class WelcomeWindow:
             info_frame,
             text="阿凯(MaydayV)",
             url="https://github.com/MaydayV",
-            font=("Microsoft YaHei UI", 10),
+            font=(DEFAULT_FONT, 10),
             bg="#f5f5f7"
         )
         dev_link.pack(side=tk.LEFT)
@@ -253,7 +285,7 @@ class MainWindow:
         tk.Label(
             title_frame,
             text="📄 发票提取",
-            font=("Microsoft YaHei UI", 16, "bold"),
+            font=(DEFAULT_FONT, 16, "bold"),
             bg="white",
             fg="#1d1d1f"
         ).pack(side=tk.LEFT)
@@ -261,12 +293,14 @@ class MainWindow:
         tk.Button(
             title_frame,
             text="← 返回",
-            font=("Microsoft YaHei UI", 9),
+            font=(DEFAULT_FONT, 9),
             bg="#f5f5f7",
             fg="#86868b",
-            relief=tk.FLAT,
+            relief=tk.RAISED,
             cursor="hand2",
-            command=self.back_to_welcome
+            command=self.back_to_welcome,
+            bd=1,
+            highlightthickness=0
         ).pack(side=tk.RIGHT)
 
         # 配置区域
@@ -275,20 +309,22 @@ class MainWindow:
 
         # 发票目录
         tk.Label(config_frame, text="发票目录:", bg="white").grid(row=0, column=0, sticky=tk.W, pady=8)
-        self.dir_entry = tk.Entry(config_frame, width=40, font=("Microsoft YaHei UI", 10))
+        self.dir_entry = tk.Entry(config_frame, width=40, font=(DEFAULT_FONT, 10))
         self.dir_entry.grid(row=0, column=1, pady=8, padx=5, sticky=tk.W)
-        tk.Button(config_frame, text="浏览...", command=self.browse_dir, width=10).grid(row=0, column=2, padx=5)
+        tk.Button(config_frame, text="浏览...", command=self.browse_dir, width=10,
+                 relief=tk.RAISED, bd=1).grid(row=0, column=2, padx=5)
 
         # 购买方关键词
         tk.Label(config_frame, text="购买方关键词:", bg="white").grid(row=1, column=0, sticky=tk.W, pady=8)
-        self.buyer_entry = tk.Entry(config_frame, width=40, font=("Microsoft YaHei UI", 10))
+        self.buyer_entry = tk.Entry(config_frame, width=40, font=(DEFAULT_FONT, 10))
         self.buyer_entry.grid(row=1, column=1, pady=8, padx=5, sticky=tk.W)
 
         # 输出文件
         tk.Label(config_frame, text="输出文件:", bg="white").grid(row=2, column=0, sticky=tk.W, pady=8)
-        self.output_entry = tk.Entry(config_frame, width=40, font=("Microsoft YaHei UI", 10))
+        self.output_entry = tk.Entry(config_frame, width=40, font=(DEFAULT_FONT, 10))
         self.output_entry.grid(row=2, column=1, pady=8, padx=5, sticky=tk.W)
-        tk.Button(config_frame, text="浏览...", command=self.browse_output, width=10).grid(row=2, column=2, padx=5)
+        tk.Button(config_frame, text="浏览...", command=self.browse_output, width=10,
+                 relief=tk.RAISED, bd=1).grid(row=2, column=2, padx=5)
 
         config_frame.columnconfigure(1, weight=1)
 
@@ -304,15 +340,16 @@ class MainWindow:
         btn_frame.pack(fill=tk.X)
 
         self.install_btn = tk.Button(btn_frame, text="安装依赖", bg="#f39c12", fg="white",
-                                    command=self.install_deps, width=12, font=("Microsoft YaHei UI", 10))
+                                    command=self.install_deps, width=12, font=(DEFAULT_FONT, 10),
+                                    relief=tk.RAISED, bd=1, highlightthickness=0)
         self.install_btn.pack(side=tk.LEFT, padx=(0, 10))
 
         if self.deps_ok:
             self.install_btn.config(state=tk.DISABLED, text="依赖已安装")
 
         self.run_btn = tk.Button(btn_frame, text="开始提取", bg="#27ae60", fg="white",
-                                 command=self.run_extractor, font=("Microsoft YaHei UI", 10, "bold"),
-                                 width=12)
+                                 command=self.run_extractor, font=(DEFAULT_FONT, 10, "bold"),
+                                 width=12, relief=tk.RAISED, bd=1, highlightthickness=0)
         self.run_btn.pack(side=tk.RIGHT)
 
         # 状态栏

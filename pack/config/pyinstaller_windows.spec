@@ -27,11 +27,15 @@ a = Analysis(
         'openpyxl',
         'importlib',
         'importlib.util',
+        'platform',  # 新增：字体检测需要
+        'webbrowser',  # 新增：链接点击需要
         'tkinter',
         'tkinter.ttk',
         'tkinter.filedialog',
         'tkinter.messagebox',
         'tkinter.scrolledtext',
+        'tkinter.commondialog',
+        'tkinter.dialog',
     ],
     hookspath=[os.path.join(pack_dir, 'hooks')],
     hooksconfig={},
