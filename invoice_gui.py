@@ -261,6 +261,13 @@ class MainWindow:
                     self._complete_safe(True, msg_data)
                 elif msg_type == "error":
                     self._complete_safe(False, msg_data)
+                elif msg_type == "install_complete":
+                    success, msg = msg_data
+                    if success:
+                        self.install_btn.config(text="  依赖已安装  ", bg="#cccccc", fg="#666666", cursor="")
+                        self.install_btn.command = None
+                        self.deps_ok = True
+                    self._log_safe(msg)
         except queue.Empty:
             pass
         # 继续检查队列
@@ -389,6 +396,15 @@ class MainWindow:
 
         self.run_btn.config(text="  处理中...  ")
 
+        # 先输出开始信息
+        self.log("="*50)
+        self.log("开始处理发票...")
+        self.log(f"发票目录: {dir_path}")
+        self.log(f"购买方关键词: {buyer_keyword}")
+        self.log(f"输出文件: {output_path}")
+        self.log("="*50)
+        self.log("正在扫描文件，请稍候...")
+
         # 在新线程中运行
         thread = threading.Thread(
             target=process_invoices,
@@ -415,9 +431,8 @@ class MainWindow:
 
 
 def main():
-    root = tk.Tk()
     app = MainWindow()
-    root.mainloop()
+    app.root.mainloop()
 
 
 if __name__ == "__main__":
