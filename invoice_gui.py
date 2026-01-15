@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 发票提取器 - Windows/Linux 版本
-欢迎界面 + 提取界面
+直接进入主界面
 """
 
 import tkinter as tk
@@ -10,17 +10,14 @@ from tkinter import filedialog, messagebox, scrolledtext
 import threading
 import os
 import sys
-import webbrowser
+import queue
 
 # 版本号
-VERSION = "1.0.1"
+VERSION = "1.0.3"
 
 
 def get_resource_path(relative_path):
-    """获取资源文件的绝对路径（兼容 PyInstaller 打包后的路径）
-
-    PyInstaller 打包后，资源文件会被解压到 sys._MEIPASS 临时目录
-    """
+    """获取资源文件的绝对路径（兼容 PyInstaller 打包后的路径）"""
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.dirname(__file__), relative_path)
@@ -56,14 +53,22 @@ def install_deps(callback):
         callback(False, f"安装失败: {str(e)}")
 
 
-def process_invoices(base_path, buyer_keyword, output_path, log_callback):
-    """处理发票并生成Excel"""
+def process_invoices(base_path, buyer_keyword, output_path, log_queue):
+    """处理发票并生成Excel - 使用队列传递日志"""
     import importlib.util
-    extractor_path = get_resource_path("invoice_extractor.py")
-    spec = importlib.util.spec_from_file_location("invoice_extractor", extractor_path)
-    extractor = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(extractor)
-    return extractor.process_invoices(base_path, buyer_keyword, output_path, log_callback)
+
+    def log_callback(msg):
+        log_queue.put(("log", msg))
+
+    try:
+        extractor_path = get_resource_path("invoice_extractor.py")
+        spec = importlib.util.spec_from_file_location("invoice_extractor", extractor_path)
+        extractor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(extractor)
+        result = extractor.process_invoices(base_path, buyer_keyword, output_path, log_callback)
+        log_queue.put(("success", result))
+    except Exception as e:
+        log_queue.put(("error", str(e)))
 
 
 class ClickableLabel(tk.Label):
@@ -71,13 +76,11 @@ class ClickableLabel(tk.Label):
 
     def __init__(self, parent, text, command=None, bg_color="#007AFF",
                  text_color="white", font_size=12, font_weight="normal", **kwargs):
-        # 使用默认字体，只在需要时添加样式
         if font_weight == "bold":
             font_spec = ("TkDefaultFont", font_size, "bold")
         else:
             font_spec = ("TkDefaultFont", font_size)
 
-        # 调用父类初始化 - 移除 Label 不支持的 relief 和 bd
         super().__init__(
             parent,
             text=text,
@@ -92,13 +95,11 @@ class ClickableLabel(tk.Label):
         self.normal_bg = bg_color
         self.hover_bg = self._darken_color(bg_color)
 
-        # 绑定事件
         self.bind('<Button-1>', self._on_click)
         self.bind('<Enter>', self._on_enter)
         self.bind('<Leave>', self._on_leave)
 
     def _darken_color(self, hex_color, factor=0.8):
-        """使颜色变暗用于悬停效果"""
         if not hex_color.startswith('#'):
             return hex_color
         try:
@@ -113,156 +114,14 @@ class ClickableLabel(tk.Label):
             return hex_color
 
     def _on_click(self, event):
-        """处理点击事件"""
         if self.command:
             self.command()
 
     def _on_enter(self, event):
-        """鼠标悬停效果"""
         self.config(bg=self.hover_bg)
 
     def _on_leave(self, event):
-        """鼠标离开效果"""
         self.config(bg=self.normal_bg)
-
-
-class LinkLabel(tk.Label):
-    """可点击的超链接标签"""
-    def __init__(self, parent, text, url, **kwargs):
-        kwargs['fg'] = kwargs.pop('fg', '#007AFF')
-        kwargs['cursor'] = 'hand2'
-        super().__init__(parent, text=text, **kwargs)
-
-        self.url = url
-        self.default_fg = '#007AFF'
-        self.hover_fg = '#0051D5'
-
-        self.bind('<Enter>', self._on_enter)
-        self.bind('<Leave>', self._on_leave)
-        self.bind('<Button-1>', self._on_click)
-
-    def _on_enter(self, event):
-        self.config(fg=self.hover_fg)
-
-    def _on_leave(self, event):
-        self.config(fg=self.default_fg)
-
-    def _on_click(self, event):
-        webbrowser.open(self.url)
-
-
-class WelcomeWindow:
-    """欢迎窗口"""
-    def __init__(self, root):
-        self.root = root
-        self.root.title("发票提取器")
-        self.root.geometry("480x380")
-        self.root.resizable(False, False)
-        self.root.configure(bg="#f5f5f7")
-
-        self.center_window()
-        self.setup_ui()
-
-    def center_window(self):
-        """窗口居中"""
-        self.root.update_idletasks()
-        width = self.root.winfo_width()
-        height = self.root.winfo_height()
-        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.root.winfo_screenheight() // 2) - (height // 2)
-        self.root.geometry(f'{width}x{height}+{x}+{y}')
-
-    def setup_ui(self):
-        """设置界面"""
-        # 主容器
-        main_frame = tk.Frame(self.root, bg="#f5f5f7")
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=40, pady=40)
-
-        # 图标/标题区域
-        title_frame = tk.Frame(main_frame, bg="#f5f5f7")
-        title_frame.pack(pady=(0, 20))
-
-        # 图标
-        tk.Label(
-            title_frame,
-            text="📄",
-            font=("TkDefaultFont", 44),
-            bg="#f5f5f7",
-            fg="#007AFF"
-        ).pack()
-
-        # 软件名称
-        tk.Label(
-            title_frame,
-            text="发票提取器",
-            font=("TkDefaultFont", 20, "bold"),
-            bg="#f5f5f7",
-            fg="#1d1d1f"
-        ).pack(pady=(8, 4))
-
-        # 版本号
-        tk.Label(
-            title_frame,
-            text=f"版本 {VERSION}",
-            font=("TkDefaultFont", 10),
-            bg="#f5f5f7",
-            fg="#86868b"
-        ).pack()
-
-        # 分隔线
-        tk.Frame(main_frame, bg="#e5e5e5", height=1).pack(fill=tk.X, pady=(15, 15))
-
-        # 功能说明
-        tk.Label(
-            main_frame,
-            text="智能识别PDF发票，自动提取发票信息\n支持普通发票和高速费发票，一键生成Excel清单",
-            font=("TkDefaultFont", 11),
-            bg="#f5f5f7",
-            fg="#3a3a3c",
-            justify=tk.CENTER
-        ).pack(pady=(0, 20))
-
-        # 按钮区域 - 使用 Frame 确保布局正确
-        button_frame = tk.Frame(main_frame, bg="#f5f5f7", height=50)
-        button_frame.pack(pady=(10, 0))
-        button_frame.pack_propagate(False)  # 防止子组件改变 Frame 大小
-
-        # 提取发票按钮 - 使用自定义 ClickableLabel
-        self.extract_btn = ClickableLabel(
-            button_frame,
-            text="  提取发票  ",
-            command=self.start_extract,
-            bg_color="#007AFF",
-            text_color="white",
-            font_size=13,
-            font_weight="bold"
-        )
-        self.extract_btn.pack()
-
-        # 开发者信息
-        info_frame = tk.Frame(main_frame, bg="#f5f5f7")
-        info_frame.pack(side=tk.BOTTOM, pady=(15, 0))
-
-        tk.Label(
-            info_frame,
-            text="开发者: ",
-            font=("TkDefaultFont", 9),
-            bg="#f5f5f7",
-            fg="#86868b"
-        ).pack(side=tk.LEFT)
-
-        LinkLabel(
-            info_frame,
-            text="阿凯(MaydayV)",
-            url="https://github.com/MaydayV",
-            font=("TkDefaultFont", 9),
-            bg="#f5f5f7"
-        ).pack(side=tk.LEFT)
-
-    def start_extract(self):
-        """开始提取流程"""
-        self.root.destroy()
-        MainWindow()
 
 
 class MainWindow:
@@ -271,13 +130,18 @@ class MainWindow:
         self.root = tk.Tk()
         self.root.title("发票提取器")
         self.root.geometry("600x500")
-        self.root.resizable(True, True)
+
+        # 日志队列（线程安全）
+        self.log_queue = queue.Queue()
 
         # 检查依赖
         deps_ok, deps_msg = check_and_install_deps()
         self.deps_ok = deps_ok
 
         self.setup_ui()
+
+        # 启动日志处理
+        self.process_log_queue()
 
         if not deps_ok:
             self.log(f"⚠️ {deps_msg}")
@@ -299,17 +163,6 @@ class MainWindow:
             bg="white",
             fg="#1d1d1f"
         ).pack(side=tk.LEFT)
-
-        # 返回按钮
-        back_btn = ClickableLabel(
-            title_frame,
-            text=" ← 返回 ",
-            command=self.back_to_welcome,
-            bg_color="#f5f5f7",
-            text_color="#86868b",
-            font_size=9
-        )
-        back_btn.pack(side=tk.RIGHT)
 
         # 配置区域
         config_frame = tk.LabelFrame(main_frame, text="配置选项", padx=15, pady=15, bg="white")
@@ -374,7 +227,6 @@ class MainWindow:
 
         if self.deps_ok:
             self.install_btn.config(text="  依赖已安装  ", bg="#cccccc", fg="#666666", cursor="")
-            # 禁用点击
             self.install_btn.command = None
 
         # 开始提取按钮
@@ -395,10 +247,32 @@ class MainWindow:
         tk.Label(main_frame, textvariable=self.status_var,
                 relief=tk.SUNKEN, anchor=tk.W, bg="#f5f5f7", fg="#86868b").pack(fill=tk.X, pady=(10, 0))
 
-    def back_to_welcome(self):
-        """返回欢迎界面"""
-        self.root.destroy()
-        WelcomeWindow(tk.Tk())
+    def process_log_queue(self):
+        """处理日志队列（在主线程中安全地更新UI）"""
+        try:
+            while True:
+                msg_type, msg_data = self.log_queue.get_nowait()
+                if msg_type == "log":
+                    self._log_safe(msg_data)
+                elif msg_type == "success":
+                    self._complete_safe(True, msg_data)
+                elif msg_type == "error":
+                    self._complete_safe(False, msg_data)
+        except queue.Empty:
+            pass
+        # 继续检查队列
+        self.root.after(100, self.process_log_queue)
+
+    def _log_safe(self, message):
+        """安全的日志方法（主线程调用）"""
+        print(message)
+        self.log_text.insert(tk.END, message + "\n")
+        self.log_text.see(tk.END)
+
+    def log(self, message):
+        """添加日志到队列"""
+        print(message)
+        self.log_queue.put(("log", message))
 
     def browse_dir(self):
         directory = filedialog.askdirectory(title="选择发票所在目录")
@@ -416,24 +290,16 @@ class MainWindow:
             self.output_entry.delete(0, tk.END)
             self.output_entry.insert(0, filename)
 
-    def log(self, message):
-        print(message)
-        self.log_text.insert(tk.END, message + "\n")
-        self.log_text.see(tk.END)
-        self.root.update()
-
     def install_deps(self):
         if self.deps_ok:
             return
 
-        def update_callback(success, msg):
-            self.install_btn.config(text="  依赖已安装  ", bg="#cccccc", fg="#666666", cursor="")
-            self.install_btn.command = None
-            self.deps_ok = True
-            self.log(msg)
-
         self.log("正在安装依赖...")
         self.install_btn.config(text="  安装中...  ")
+
+        def update_callback(success, msg):
+            self.log_queue.put(("install_complete", (success, msg)))
+
         thread = threading.Thread(target=lambda: install_deps(update_callback))
         thread.start()
 
@@ -465,25 +331,16 @@ class MainWindow:
 
         self.run_btn.config(text="  处理中...  ")
 
-        def run_thread():
-            try:
-                self.log("="*50)
-                self.log("开始处理发票...")
-                self.log(f"发票目录: {dir_path}")
-                self.log(f"购买方关键词: {buyer_keyword}")
-                self.log(f"输出文件: {output_path}")
-                self.log("="*50)
-
-                result = process_invoices(dir_path, buyer_keyword, output_path, self.log)
-
-                self.root.after(0, lambda: self.complete(True, result))
-            except Exception as e:
-                self.root.after(0, lambda: self.complete(False, str(e)))
-
-        thread = threading.Thread(target=run_thread)
+        # 在新线程中运行
+        thread = threading.Thread(
+            target=process_invoices,
+            args=(dir_path, buyer_keyword, output_path, self.log_queue)
+        )
+        thread.daemon = True
         thread.start()
 
-    def complete(self, success, result):
+    def _complete_safe(self, success, result):
+        """安全的完成方法（主线程调用）"""
         self.run_btn.config(text="  开始提取  ")
 
         if success:
@@ -501,7 +358,7 @@ class MainWindow:
 
 def main():
     root = tk.Tk()
-    app = WelcomeWindow(root)
+    app = MainWindow()
     root.mainloop()
 
 
