@@ -6,31 +6,14 @@
 """
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext, ttk
+from tkinter import filedialog, messagebox, scrolledtext
 import threading
 import os
 import sys
 import webbrowser
-import platform
-
 
 # 版本号
 VERSION = "1.0.1"
-
-
-def get_default_font():
-    """获取系统默认中文字体，带回退机制"""
-    system = platform.system()
-
-    if system == "Windows":
-        return "Microsoft YaHei UI"
-    elif system == "Darwin":  # macOS
-        return "PingFang SC"
-    else:  # Linux
-        return "WenQuanYi Micro Hei"
-
-
-DEFAULT_FONT = get_default_font()
 
 
 def get_resource_path(relative_path):
@@ -83,41 +66,75 @@ def process_invoices(base_path, buyer_keyword, output_path, log_callback):
     return extractor.process_invoices(base_path, buyer_keyword, output_path, log_callback)
 
 
-class StyledButton(ttk.Button):
-    """自定义样式按钮，支持 Windows"""
+class ClickableLabel(tk.Label):
+    """可点击的 Label，用作按钮"""
 
-    def __init__(self, parent, text, command=None, bg="#007AFF", fg="white",
-                 font=(DEFAULT_FONT, 11), width=None, **kwargs):
-        super().__init__(parent, text=text, command=command, **kwargs)
+    def __init__(self, parent, text, command=None, bg_color="#007AFF",
+                 text_color="white", font_size=12, font_weight="normal", **kwargs):
+        # 使用默认字体，只在需要时添加样式
+        if font_weight == "bold":
+            font_spec = ("TkDefaultFont", font_size, "bold")
+        else:
+            font_spec = ("TkDefaultFont", font_size)
 
-        self.bg_color = bg
-        self.fg_color = fg
+        # 调用父类初始化 - 移除 Label 不支持的 relief 和 bd
+        super().__init__(
+            parent,
+            text=text,
+            bg=bg_color,
+            fg=text_color,
+            font=font_spec,
+            cursor="hand2",
+            **kwargs
+        )
 
-        # 创建唯一样式名称
-        style_name = f"CustomButton.{id(self)}"
-        self.style = ttk.Style()
-        self.style.configure(style_name,
-                           font=font,
-                           background=bg,
-                           foreground=fg,
-                           borderwidth=0,
-                           focuscolor='none',
-                           relief='flat')
+        self.command = command
+        self.normal_bg = bg_color
+        self.hover_bg = self._darken_color(bg_color)
 
-        # 设置按钮样式
-        self.configure(style=style_name, width=width)
+        # 绑定事件
+        self.bind('<Button-1>', self._on_click)
+        self.bind('<Enter>', self._on_enter)
+        self.bind('<Leave>', self._on_leave)
+
+    def _darken_color(self, hex_color, factor=0.8):
+        """使颜色变暗用于悬停效果"""
+        if not hex_color.startswith('#'):
+            return hex_color
+        try:
+            r = int(hex_color[1:3], 16)
+            g = int(hex_color[3:5], 16)
+            b = int(hex_color[5:7], 16)
+            r = int(r * factor)
+            g = int(g * factor)
+            b = int(b * factor)
+            return f"#{r:02x}{g:02x}{b:02x}"
+        except:
+            return hex_color
+
+    def _on_click(self, event):
+        """处理点击事件"""
+        if self.command:
+            self.command()
+
+    def _on_enter(self, event):
+        """鼠标悬停效果"""
+        self.config(bg=self.hover_bg)
+
+    def _on_leave(self, event):
+        """鼠标离开效果"""
+        self.config(bg=self.normal_bg)
 
 
 class LinkLabel(tk.Label):
     """可点击的超链接标签"""
     def __init__(self, parent, text, url, **kwargs):
-        default_fg = kwargs.pop('fg', '#007AFF')
-        kwargs['fg'] = default_fg
+        kwargs['fg'] = kwargs.pop('fg', '#007AFF')
         kwargs['cursor'] = 'hand2'
         super().__init__(parent, text=text, **kwargs)
 
         self.url = url
-        self.default_fg = default_fg
+        self.default_fg = '#007AFF'
         self.hover_fg = '#0051D5'
 
         self.bind('<Enter>', self._on_enter)
@@ -139,31 +156,12 @@ class WelcomeWindow:
     def __init__(self, root):
         self.root = root
         self.root.title("发票提取器")
-        self.root.geometry("480x360")
+        self.root.geometry("480x380")
         self.root.resizable(False, False)
         self.root.configure(bg="#f5f5f7")
 
-        # 配置 ttk 样式
-        self.setup_ttk_style()
-
         self.center_window()
         self.setup_ui()
-
-    def setup_ttk_style(self):
-        """配置 ttk 样式以支持 Windows"""
-        self.style = ttk.Style()
-        # 使用默认主题
-        current_theme = self.style.theme_use()
-        # 配置按钮样式
-        self.style.configure("Primary.TButton",
-                           font=(DEFAULT_FONT, 13, "bold"),
-                           background="#007AFF",
-                           foreground="white",
-                           borderwidth=0,
-                           focuscolor='none',
-                           relief='flat')
-        self.style.map("Primary.TButton",
-                      background=[('active', '#0051D5')])
 
     def center_window(self):
         """窗口居中"""
@@ -188,7 +186,7 @@ class WelcomeWindow:
         tk.Label(
             title_frame,
             text="📄",
-            font=(DEFAULT_FONT, 48),
+            font=("TkDefaultFont", 44),
             bg="#f5f5f7",
             fg="#007AFF"
         ).pack()
@@ -197,7 +195,7 @@ class WelcomeWindow:
         tk.Label(
             title_frame,
             text="发票提取器",
-            font=(DEFAULT_FONT, 24, "bold"),
+            font=("TkDefaultFont", 20, "bold"),
             bg="#f5f5f7",
             fg="#1d1d1f"
         ).pack(pady=(8, 4))
@@ -206,52 +204,49 @@ class WelcomeWindow:
         tk.Label(
             title_frame,
             text=f"版本 {VERSION}",
-            font=(DEFAULT_FONT, 11),
+            font=("TkDefaultFont", 10),
             bg="#f5f5f7",
             fg="#86868b"
         ).pack()
 
         # 分隔线
-        tk.Frame(main_frame, bg="#e5e5e5", height=1).pack(fill=tk.X, pady=(20, 20))
+        tk.Frame(main_frame, bg="#e5e5e5", height=1).pack(fill=tk.X, pady=(15, 15))
 
         # 功能说明
         tk.Label(
             main_frame,
             text="智能识别PDF发票，自动提取发票信息\n支持普通发票和高速费发票，一键生成Excel清单",
-            font=(DEFAULT_FONT, 12),
+            font=("TkDefaultFont", 11),
             bg="#f5f5f7",
             fg="#3a3a3c",
             justify=tk.CENTER
         ).pack(pady=(0, 20))
 
-        # 按钮区域
-        button_frame = tk.Frame(main_frame, bg="#f5f5f7")
+        # 按钮区域 - 使用 Frame 确保布局正确
+        button_frame = tk.Frame(main_frame, bg="#f5f5f7", height=50)
         button_frame.pack(pady=(10, 0))
+        button_frame.pack_propagate(False)  # 防止子组件改变 Frame 大小
 
-        # 提取发票按钮 - 使用 Label 模拟按钮确保跨平台兼容
-        self.extract_btn = tk.Label(
+        # 提取发票按钮 - 使用自定义 ClickableLabel
+        self.extract_btn = ClickableLabel(
             button_frame,
             text="  提取发票  ",
-            font=(DEFAULT_FONT, 13, "bold"),
-            bg="#007AFF",
-            fg="white",
-            cursor="hand2",
-            padx=30,
-            pady=10
+            command=self.start_extract,
+            bg_color="#007AFF",
+            text_color="white",
+            font_size=13,
+            font_weight="bold"
         )
         self.extract_btn.pack()
-        self.extract_btn.bind('<Button-1>', lambda e: self.start_extract())
-        self.extract_btn.bind('<Enter>', self._on_btn_enter)
-        self.extract_btn.bind('<Leave>', self._on_btn_leave)
 
         # 开发者信息
         info_frame = tk.Frame(main_frame, bg="#f5f5f7")
-        info_frame.pack(side=tk.BOTTOM, pady=(20, 0))
+        info_frame.pack(side=tk.BOTTOM, pady=(15, 0))
 
         tk.Label(
             info_frame,
             text="开发者: ",
-            font=(DEFAULT_FONT, 10),
+            font=("TkDefaultFont", 9),
             bg="#f5f5f7",
             fg="#86868b"
         ).pack(side=tk.LEFT)
@@ -260,17 +255,9 @@ class WelcomeWindow:
             info_frame,
             text="阿凯(MaydayV)",
             url="https://github.com/MaydayV",
-            font=(DEFAULT_FONT, 10),
+            font=("TkDefaultFont", 9),
             bg="#f5f5f7"
         ).pack(side=tk.LEFT)
-
-    def _on_btn_enter(self, event):
-        """按钮悬停效果"""
-        self.extract_btn.config(bg="#0051D5")
-
-    def _on_btn_leave(self, event):
-        """按钮离开效果"""
-        self.extract_btn.config(bg="#007AFF")
 
     def start_extract(self):
         """开始提取流程"""
@@ -308,22 +295,21 @@ class MainWindow:
         tk.Label(
             title_frame,
             text="📄 发票提取",
-            font=(DEFAULT_FONT, 16, "bold"),
+            font=("TkDefaultFont", 14, "bold"),
             bg="white",
             fg="#1d1d1f"
         ).pack(side=tk.LEFT)
 
-        # 返回按钮 - 使用 Label 模拟
-        back_btn = tk.Label(
+        # 返回按钮
+        back_btn = ClickableLabel(
             title_frame,
             text=" ← 返回 ",
-            font=(DEFAULT_FONT, 9),
-            bg="#f5f5f7",
-            fg="#86868b",
-            cursor="hand2"
+            command=self.back_to_welcome,
+            bg_color="#f5f5f7",
+            text_color="#86868b",
+            font_size=9
         )
         back_btn.pack(side=tk.RIGHT)
-        back_btn.bind('<Button-1>', lambda e: self.back_to_welcome())
 
         # 配置区域
         config_frame = tk.LabelFrame(main_frame, text="配置选项", padx=15, pady=15, bg="white")
@@ -331,38 +317,36 @@ class MainWindow:
 
         # 发票目录
         tk.Label(config_frame, text="发票目录:", bg="white").grid(row=0, column=0, sticky=tk.W, pady=8)
-        self.dir_entry = tk.Entry(config_frame, width=40, font=(DEFAULT_FONT, 10))
+        self.dir_entry = tk.Entry(config_frame, width=40)
         self.dir_entry.grid(row=0, column=1, pady=8, padx=5, sticky=tk.W)
 
-        browse_btn1 = tk.Label(
+        ClickableLabel(
             config_frame,
-            text=" 浏览... ",
-            bg="#e0e0e0",
-            fg="#333",
-            cursor="hand2"
-        )
-        browse_btn1.grid(row=0, column=2, padx=5)
-        browse_btn1.bind('<Button-1>', lambda e: self.browse_dir())
+            text=" 浏览 ",
+            command=self.browse_dir,
+            bg_color="#e0e0e0",
+            text_color="#333",
+            font_size=9
+        ).grid(row=0, column=2, padx=5)
 
         # 购买方关键词
         tk.Label(config_frame, text="购买方关键词:", bg="white").grid(row=1, column=0, sticky=tk.W, pady=8)
-        self.buyer_entry = tk.Entry(config_frame, width=40, font=(DEFAULT_FONT, 10))
+        self.buyer_entry = tk.Entry(config_frame, width=40)
         self.buyer_entry.grid(row=1, column=1, pady=8, padx=5, sticky=tk.W)
 
         # 输出文件
         tk.Label(config_frame, text="输出文件:", bg="white").grid(row=2, column=0, sticky=tk.W, pady=8)
-        self.output_entry = tk.Entry(config_frame, width=40, font=(DEFAULT_FONT, 10))
+        self.output_entry = tk.Entry(config_frame, width=40)
         self.output_entry.grid(row=2, column=1, pady=8, padx=5, sticky=tk.W)
 
-        browse_btn2 = tk.Label(
+        ClickableLabel(
             config_frame,
-            text=" 浏览... ",
-            bg="#e0e0e0",
-            fg="#333",
-            cursor="hand2"
-        )
-        browse_btn2.grid(row=2, column=2, padx=5)
-        browse_btn2.bind('<Button-1>', lambda e: self.browse_output())
+            text=" 浏览 ",
+            command=self.browse_output,
+            bg_color="#e0e0e0",
+            text_color="#333",
+            font_size=9
+        ).grid(row=2, column=2, padx=5)
 
         config_frame.columnconfigure(1, weight=1)
 
@@ -378,31 +362,32 @@ class MainWindow:
         btn_frame.pack(fill=tk.X)
 
         # 安装依赖按钮
-        self.install_btn = tk.Label(
+        self.install_btn = ClickableLabel(
             btn_frame,
             text="  安装依赖  ",
-            bg="#f39c12",
-            fg="white",
-            font=(DEFAULT_FONT, 10),
-            cursor="hand2"
+            command=self.install_deps,
+            bg_color="#f39c12",
+            text_color="white",
+            font_size=10
         )
         self.install_btn.pack(side=tk.LEFT, padx=(0, 10))
-        self.install_btn.bind('<Button-1>', lambda e: self.install_deps())
 
         if self.deps_ok:
             self.install_btn.config(text="  依赖已安装  ", bg="#cccccc", fg="#666666", cursor="")
+            # 禁用点击
+            self.install_btn.command = None
 
         # 开始提取按钮
-        self.run_btn = tk.Label(
+        self.run_btn = ClickableLabel(
             btn_frame,
             text="  开始提取  ",
-            bg="#27ae60",
-            fg="white",
-            font=(DEFAULT_FONT, 10, "bold"),
-            cursor="hand2"
+            command=self.run_extractor,
+            bg_color="#27ae60",
+            text_color="white",
+            font_size=10,
+            font_weight="bold"
         )
         self.run_btn.pack(side=tk.RIGHT)
-        self.run_btn.bind('<Button-1>', lambda e: self.run_extractor())
 
         # 状态栏
         self.status_var = tk.StringVar()
@@ -443,6 +428,7 @@ class MainWindow:
 
         def update_callback(success, msg):
             self.install_btn.config(text="  依赖已安装  ", bg="#cccccc", fg="#666666", cursor="")
+            self.install_btn.command = None
             self.deps_ok = True
             self.log(msg)
 

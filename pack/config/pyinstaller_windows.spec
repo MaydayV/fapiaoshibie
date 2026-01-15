@@ -6,11 +6,11 @@ PyInstaller配置文件 - Windows版本
 """
 
 import os
+import sys
 
 block_cipher = None
 
 # 获取路径（从当前工作目录计算）
-# 假设从项目根目录运行pyinstaller
 project_root = os.getcwd()
 pack_dir = os.path.join(project_root, 'pack')
 
@@ -27,15 +27,15 @@ a = Analysis(
         'openpyxl',
         'importlib',
         'importlib.util',
-        'platform',  # 新增：字体检测需要
-        'webbrowser',  # 新增：链接点击需要
+        'webbrowser',
+        # tkinter 相关
         'tkinter',
         'tkinter.ttk',
         'tkinter.filedialog',
         'tkinter.messagebox',
         'tkinter.scrolledtext',
-        'tkinter.commondialog',
-        'tkinter.dialog',
+        '_tkinter',
+        'tkinter.constants',
     ],
     hookspath=[os.path.join(pack_dir, 'hooks')],
     hooksconfig={},
@@ -62,15 +62,15 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # 不显示控制台窗口
+    console=True,  # 临时启用控制台，方便调试
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
     icon=icon_path if os.path.exists(icon_path) else None,
-    onefile=True,  # 单文件模式
+    onefile=True,
 )
