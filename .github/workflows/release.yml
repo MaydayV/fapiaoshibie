@@ -86,11 +86,27 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: macOS-DMG
+          path: .
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
           name: Windows-EXE
+          path: .
+
+      - name: Rename files
+        run: |
+          ls -la
+          # 查找并重命名 dmg 文件
+          for f in *.dmg; do
+            if [ -f "$f" ]; then
+              mv "$f" 发票提取器.dmg
+              break
+            fi
+          done
+          # 查找并重命名 exe 文件（可能在子目录）
+          find . -type f -name "*.exe" -exec mv {} 发票提取器.exe \;
+          ls -la
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
