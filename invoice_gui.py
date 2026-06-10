@@ -41,8 +41,12 @@ def check_and_install_deps():
 
 
 def install_deps(callback):
-    """在线程中安装依赖"""
+    """在线程中安装依赖（仅开发模式，打包版中依赖已内置）"""
     import subprocess
+    # 打包版中 sys.executable 指向 bootloader 而非 Python 解释器，无法调用 pip
+    if getattr(sys, 'frozen', False):
+        callback(False, "当前为打包版本，无需安装依赖")
+        return
     try:
         subprocess.check_call([
             sys.executable, '-m', 'pip', 'install', '-q',
@@ -133,6 +137,7 @@ class MainWindow:
 
         # 日志队列（线程安全）
         self.log_queue = queue.Queue()
+        self._processing = False  # 处理中标志，防止重复点击
 
         # 检查依赖
         deps_ok, deps_msg = check_and_install_deps()
@@ -369,6 +374,11 @@ class MainWindow:
         thread.start()
 
     def run_extractor(self):
+        # 防重复点击
+        if self._processing:
+            return
+        self._processing = True
+
         dir_path = self.dir_entry.get().strip()
         buyer_keyword = self.buyer_entry.get().strip()
         output_path = self.output_entry.get().strip()
@@ -384,10 +394,12 @@ class MainWindow:
 
         if not dir_path:
             messagebox.showwarning("提示", "请选择发票目录")
+            self._processing = False
             return
 
         if not buyer_keyword:
             messagebox.showwarning("提示", "请输入购买方关键词")
+            self._processing = False
             return
 
         if not output_path:
@@ -416,6 +428,7 @@ class MainWindow:
     def _complete_safe(self, success, result):
         """安全的完成方法（主线程调用）"""
         self.run_btn.config(text="  开始提取  ")
+        self._processing = False
 
         if success:
             self.log("="*50)

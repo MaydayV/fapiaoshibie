@@ -13,6 +13,30 @@ import time
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
+# ---- 预编译正则表达式（避免每次调用重复编译）----
+RE_INVOICE_20DIGIT = re.compile(r'\b(\d{20})\b')
+RE_INVOICE_CODE_12 = re.compile(r'\b(\d{12})\b')
+RE_INVOICE_NUMBER_8 = re.compile(r'\b(\d{8})\b')
+RE_VERIFY_SPLIT = re.compile(r'(\d{5})\s+(\d{5})\s+(\d{5})\s+(\d{5})')
+RE_DATE = re.compile(r'(\d{4})年(\d{1,2})月(\d{1,2})日')
+RE_TAX_NUMBER = re.compile(r'\b[0-9A-Z]{18}\b')
+RE_ITEM_FULL = re.compile(r'\*[^*]+\*[^\n*]+')
+RE_ITEM_SHORT = re.compile(r'\*([^*]+)\*')
+RE_YUANZHENG_AMOUNT = re.compile(r'圆整\s*[¥￥]?\s*([\d,]+\.?\d*)')
+RE_ALL_AMOUNTS = re.compile(r'[¥￥]\s*([\d,]+\.?\d*)')
+RE_FILENAME_AMOUNT = re.compile(r'(\d+\.?\d*)\.(?:PDF|PNG|JPG|JPEG)', re.IGNORECASE)
+RE_HEJI_AMOUNT = re.compile(r'(?:价税合计|合计|总计|大写|小写).*?[¥￥]\s*([\d,]+\.?\d*)', re.DOTALL)
+
+# 排除模式（预编译）
+EXCLUDE_PATTERNS = [
+    re.compile(p) for p in [
+        r'\*[^*]+\*',
+        r'项目|规格|单位|数量|单价|金额|税率|税额|合计|备注|开票人|下载次数|发票号码|开票日期',
+        r'国家税务总局|发票监制|电子发票|普通发票|广东省税务局',
+        r'价税合计|大写|小写',
+    ]
+]
+
 
 def extract_invoice_info(pdf_path, buyer_keyword=None):
     """从PDF发票中提取信息
@@ -46,29 +70,29 @@ def extract_invoice_info(pdf_path, buyer_keyword=None):
         # 提取发票号码 - 支持两种格式:
         # 1. 普通发票: 20位连续数字 (发票代码+发票号码的组合)
         # 2. 高速费发票: 8位发票号码 + 12位发票代码
-        fp_match_20 = re.search(r'\b(\d{20})\b', text)
+        fp_match_20 = RE_INVOICE_20DIGIT.search(text)
         if fp_match_20:
             info['发票号码'] = fp_match_20.group(1)
         else:
             # 尝试提取高速费发票的发票代码(12位)和发票号码(8位)
             # 发票代码通常是12位数字，发票号码是8位数字
-            code_match = re.search(r'\b(\d{12})\b', text)
-            number_match = re.search(r'\b(\d{8})\b', text)
+            code_match = RE_INVOICE_CODE_12.search(text)
+            number_match = RE_INVOICE_NUMBER_8.search(text)
             if code_match and number_match:
                 info['发票代码'] = code_match.group(1)
                 info['发票号码'] = number_match.group(1)
             # 如果校验码被空格分隔，组合成20位
-            verify_match = re.search(r'(\d{5})\s+(\d{5})\s+(\d{5})\s+(\d{5})', text)
+            verify_match = RE_VERIFY_SPLIT.search(text)
             if verify_match:
                 info['校验码'] = verify_match.group(1) + verify_match.group(2) + verify_match.group(3) + verify_match.group(4)
 
         # 提取开票日期
-        date_match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', text)
+        date_match = RE_DATE.search(text)
         if date_match:
             info['开票日期'] = f"{date_match.group(1)}-{date_match.group(2).zfill(2)}-{date_match.group(3).zfill(2)}"
 
         # 提取税号（18位，可能包含字母）
-        tax_numbers = re.findall(r'\b[0-9A-Z]{18}\b', text)
+        tax_numbers = RE_TAX_NUMBER.findall(text)
         valid_taxes = [t for t in tax_numbers if not (t.isdigit() and len(t) == 20)]
         if len(valid_taxes) >= 1:
             info['购买方税号'] = valid_taxes[0]
@@ -77,7 +101,7 @@ def extract_invoice_info(pdf_path, buyer_keyword=None):
 
         # 提取项目内容 - 支持 *类别*项目名 格式（如 *经营租赁*通行费）
         # 先尝试匹配完整的 *类别*项目名 格式
-        item_match_full = re.search(r'\*[^*]+\*[^\n*]+', text)
+        item_match_full = RE_ITEM_FULL.search(text)
         if item_match_full:
             item_content = item_match_full.group(0).strip()
             # 去除可能的换行符和多余空格
@@ -85,17 +109,9 @@ def extract_invoice_info(pdf_path, buyer_keyword=None):
             info['项目内容'] = item_content[:50]
         else:
             # 降级到只匹配 *类别* 格式
-            item_match = re.search(r'\*([^*]+)\*', text)
+            item_match = RE_ITEM_SHORT.search(text)
             if item_match:
                 info['项目内容'] = item_match.group(0)[:30]
-
-        # 排除模式
-        exclude_patterns = [
-            r'\*[^*]+\*',
-            r'项目|规格|单位|数量|单价|金额|税率|税额|合计|备注|开票人|下载次数|发票号码|开票日期',
-            r'国家税务总局|发票监制|电子发票|普通发票|广东省税务局',
-            r'价税合计|大写|小写',
-        ]
 
         # 销售方关键词（扩展覆盖各种类型）
         seller_keywords = [
@@ -118,9 +134,9 @@ def extract_invoice_info(pdf_path, buyer_keyword=None):
         lines = text.split('\n')
         for line in lines:
             line = line.strip()
-            if len(line) < 5 or len(line) > 60:
+            if len(line) < 5 or len(line) > 80:
                 continue
-            if any(re.search(p, line) for p in exclude_patterns):
+            if any(p.search(line) for p in EXCLUDE_PATTERNS):
                 continue
             if any(kw in line for kw in seller_keywords):
                 if not line.endswith('费'):
@@ -173,29 +189,35 @@ def extract_invoice_info(pdf_path, buyer_keyword=None):
                             break
 
         # 提取金额 - 优先找"圆整"后的金额
-        amount_near_yuanzheng = re.search(r'圆整\s*[¥￥]?\s*([\d,]+\.?\d*)', text)
+        amount_near_yuanzheng = RE_YUANZHENG_AMOUNT.search(text)
         if amount_near_yuanzheng:
             info['金额'] = amount_near_yuanzheng.group(1).replace(',', '')
         else:
-            # 找所有¥后的金额，取最大的（价税合计通常是最大的）
-            all_amounts = re.findall(r'[¥￥]\s*([\d,]+\.?\d*)', text)
-            if all_amounts:
-                amounts_float = []
-                for a in all_amounts:
-                    try:
-                        amt = float(a.replace(',', ''))
-                        if 0 < amt < 10000000:
-                            amounts_float.append((amt, a))
-                    except:
-                        pass
-                if amounts_float:
-                    max_amount = max(amounts_float, key=lambda x: x[0])
-                    info['金额'] = max_amount[1].replace(',', '')
+            # 第二优先：找"价税合计""合计""总计"附近的金额
+            heji_match = RE_HEJI_AMOUNT.search(text)
+            if heji_match:
+                info['金额'] = heji_match.group(1).replace(',', '')
+            else:
+                # 第三选择：找所有¥后的金额，取最大的（价税合计通常是最大的）
+                # 过滤掉明显异常的小额（<1元）和超大额（>1000万）
+                all_amounts = RE_ALL_AMOUNTS.findall(text)
+                if all_amounts:
+                    amounts_float = []
+                    for a in all_amounts:
+                        try:
+                            amt = float(a.replace(',', ''))
+                            if 1.0 < amt < 10000000:
+                                amounts_float.append((amt, a))
+                        except:
+                            pass
+                    if amounts_float:
+                        max_amount = max(amounts_float, key=lambda x: x[0])
+                        info['金额'] = max_amount[1].replace(',', '')
 
         # 从文件名提取金额（备用方案）
         if not info['金额']:
             filename = os.path.basename(pdf_path)
-            amount_match = re.search(r'(\d+\.?\d*)\.pdf', filename)
+            amount_match = RE_FILENAME_AMOUNT.search(filename)
             if amount_match:
                 info['金额'] = amount_match.group(1)
 
@@ -218,7 +240,12 @@ def extract_invoice_info(pdf_path, buyer_keyword=None):
         return info
 
     except Exception as e:
-        return {'备注': f'解析错误: {str(e)}'}
+        return {
+            '发票号码': '', '发票代码': '', '开票日期': '',
+            '购买方': '', '购买方税号': '', '销售方': '', '销售方税号': '',
+            '项目内容': '', '金额': '',
+            '备注': f'解析错误: {str(e)}'
+        }
 
 
 def process_invoices(base_path, buyer_keyword=None, output_path=None, log_callback=None):
@@ -246,20 +273,19 @@ def process_invoices(base_path, buyer_keyword=None, output_path=None, log_callba
         dirs[:] = [d for d in dirs if not d.startswith('.')]
 
         for file in files:
-            if file.lower().endswith(('.pdf', '.png', '.jpg', '.jpeg')):
+            # 只处理 PDF 文件（图片不支持 OCR 识别，跳过以避免输出空行）
+            if file.lower().endswith('.pdf'):
                 full_path = os.path.join(root, file)
                 rel_path = os.path.relpath(root, base_path)
-                file_ext = os.path.splitext(file)[1].upper()
 
                 invoice_data = {
                     '文件夹': rel_path,
                     '文件名': file,
-                    '文件类型': file_ext
+                    '文件类型': 'PDF'
                 }
 
-                if file.lower().endswith('.pdf'):
-                    info = extract_invoice_info(full_path, buyer_keyword)
-                    invoice_data.update(info)
+                info = extract_invoice_info(full_path, buyer_keyword)
+                invoice_data.update(info)
 
                 all_invoices.append(invoice_data)
 
@@ -296,13 +322,6 @@ def process_invoices(base_path, buyer_keyword=None, output_path=None, log_callba
 
     # 用过滤后的列表替换原列表
     all_invoices = filtered_invoices
-
-    # 从图片文件名提取金额
-    for inv in all_invoices:
-        if not inv.get('金额') and not inv['文件名'].endswith('.pdf'):
-            amount_match = re.search(r'(\d+\.?\d*)\.(?:PNG|JPG|JPEG)', inv['文件名'])
-            if amount_match:
-                inv['金额'] = amount_match.group(1)
 
     # 生成Excel
     wb = Workbook()
@@ -417,13 +436,19 @@ def process_invoices(base_path, buyer_keyword=None, output_path=None, log_callba
     log(f"\n📊 文件统计:")
     log(f"  总文件数: {len(all_invoices)}")
     log(f"  PDF发票数: {pdf_count}")
-    if len(all_invoices) > pdf_count:
-        log(f"  其他文件(图片): {len(all_invoices) - pdf_count}")
 
     log(f"\n📈 识别率统计:")
-    log(f"  发票号码识别: {with_inv_num}/{pdf_count} ({with_inv_num/pdf_count*100:.1f}%)")
-    log(f"  销售方识别:   {with_seller}/{pdf_count} ({with_seller/pdf_count*100:.1f}%)")
-    log(f"  金额识别:     {with_amount}/{len(all_invoices)} ({with_amount/len(all_invoices)*100:.1f}%)")
+    if pdf_count > 0:
+        log(f"  发票号码识别: {with_inv_num}/{pdf_count} ({with_inv_num/pdf_count*100:.1f}%)")
+        log(f"  销售方识别:   {with_seller}/{pdf_count} ({with_seller/pdf_count*100:.1f}%)")
+    else:
+        log(f"  发票号码识别: N/A (无PDF文件)")
+        log(f"  销售方识别:   N/A (无PDF文件)")
+    total_count = len(all_invoices)
+    if total_count > 0:
+        log(f"  金额识别:     {with_amount}/{total_count} ({with_amount/total_count*100:.1f}%)")
+    else:
+        log(f"  金额识别:     N/A (无文件)")
 
     log(f"\n💰 金额统计:")
     log(f"  总金额: ¥{total_amount:,.2f}")

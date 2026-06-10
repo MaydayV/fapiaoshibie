@@ -33,7 +33,7 @@ def run_osascript(script, timeout=300):
         return None
     except subprocess.TimeoutExpired:
         return None
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -82,27 +82,28 @@ return POSIX path of dialogResult
 
 
 def show_welcome():
-    """显示欢迎对话框"""
-    # 使用简单的 AppleScript alert
-    script = '''display alert "发票提取器 v1.0.0" ¬
-        message "智能识别PDF发票，自动提取发票信息\\n支持普通发票和高速费发票，一键生成Excel清单\\n\\n开发者: 阿凯" ¬
-        buttons {"访问主页", "开始使用", "退出"} default button 2
+    """显示欢迎对话框（while 循环避免递归调用栈溢出）"""
+    while True:
+        script = '''display alert "发票提取器 v1.0.0" ¬
+            message "智能识别PDF发票，自动提取发票信息\\n支持普通发票和高速费发票，一键生成Excel清单\\n\\n开发者: 阿凯" ¬
+            buttons {"访问主页", "开始使用", "退出"} default button 2
 return button returned of result'''
 
-    result = run_osascript(script)
-    if result == "访问主页":
-        # 打开开发者 GitHub 主页
-        subprocess.run(['open', 'https://github.com/MaydayV'])
-        # 再次显示欢迎对话框
-        return show_welcome()
-    return result == "开始使用"
+        result = run_osascript(script)
+        if result == "访问主页":
+            # 打开开发者 GitHub 主页，然后再次显示欢迎对话框
+            subprocess.run(['open', 'https://github.com/MaydayV'])
+        elif result == "开始使用":
+            return True
+        else:
+            return False
 
 
 def run_extraction():
     """执行发票提取流程"""
-    print("="*50)
+    print("=" * 50)
     print("       发票提取器")
-    print("="*50)
+    print("=" * 50)
 
     # 步骤1：选择发票目录
     base_path = osascript_choose_folder("请选择发票所在目录:")
@@ -152,11 +153,11 @@ def run_extraction():
 
     # 执行处理
     print()
-    print("-"*50)
+    print("-" * 50)
     print(f"发票目录: {base_path}")
     print(f"购买方关键词: {buyer_keyword}")
     print(f"输出文件: {output_path}")
-    print("-"*50)
+    print("-" * 50)
     print()
 
     # 导入并运行主程序
@@ -179,12 +180,20 @@ def run_extraction():
 
 
 def main():
-    # 检查依赖
+    # 依赖已在打包时内置，仅在开发调试模式下才尝试安装
+    # （打包版中 sys.executable 指向 bootloader 而非 Python 解释器）
     try:
-        import fitz
-        import openpyxl
+        import fitz  # noqa: F401
+        import openpyxl  # noqa: F401
     except ImportError:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'PyMuPDF', 'openpyxl'])
+        # 仅在非打包环境（开发模式）下尝试自动安装
+        if not getattr(sys, 'frozen', False):
+            try:
+                subprocess.check_call(
+                    [sys.executable, '-m', 'pip', 'install', '-q', 'PyMuPDF', 'openpyxl']
+                )
+            except Exception:
+                print("警告：自动安装依赖失败，请手动运行: pip install PyMuPDF openpyxl")
 
     # 显示欢迎界面
     if show_welcome():

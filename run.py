@@ -39,6 +39,10 @@ def suggest_tkinter_install():
     print()
 
 def main():
+    # 切换到脚本所在目录（保证相对路径导入正确）
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
+
     print("="*50)
     print("       发票识别工具")
     print("="*50)
@@ -49,10 +53,12 @@ def main():
         import fitz
         import openpyxl
     except ImportError:
-        print("正在安装依赖...")
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'PyMuPDF', 'openpyxl'])
-        print("依赖安装完成！")
-        print()
+        # 仅在开发模式下自动安装（打包版中 sys.executable 不是 Python 解释器）
+        if not getattr(sys, 'frozen', False):
+            print("正在安装依赖...")
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', 'PyMuPDF', 'openpyxl'])
+            print("依赖安装完成！")
+            print()
 
     # 检查tkinter
     gui_available = check_tkinter()
